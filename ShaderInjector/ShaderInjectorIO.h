@@ -1,0 +1,70 @@
+// shaderinjector_io.h
+
+#pragma once
+
+#include <string>
+#include <vector>
+
+namespace ShaderInjectorIO
+{
+	//string helpers
+	static const std::string extensionBIN = ".bin"; //binary shader bytecode dumps
+	static const std::string extensionHLSL = ".hlsl"; //shader source code
+	static const std::string extensionBLOB = ".blob"; //compiled shader blob
+	static const std::string extensionDXIL = ".dxil"; //disasembled shader bytecode
+	static const std::string extensionJSON = ".json"; //shader injector text file
+	static const std::string extensionLOG  = ".log"; //shader injector log file
+	static const std::string extensionEXE  = ".exe"; //windows executable
+	static const char* imguiSettingsName = "ShaderInjectorGUI.ini";
+
+	bool PathExists(const std::string& path);
+	bool FileExists(const std::string& path);
+	void DeleteFileIfExists(const std::string& path);
+	bool WriteBinaryFile(const std::string& path, const void* data, size_t size);
+	bool WriteTextFileIfMissing(const std::string& path, const std::string& text);
+	bool DirectoryExists(const std::string& path);
+	void DirectoryCreate(const std::string& path);
+
+	std::string GetGameDirectory();
+	std::string GetShaderInjectorDirectory();
+	std::string GetDumpsDirectory();
+	std::string GetUncapturedPSODirectory();
+	std::string GetLogsDirectory();
+	std::string GetLogFilePath();
+	std::string GetToolsDirectory();
+	std::string GetToolPathDXC();
+	std::string GetShaderReplacementsDirectory();
+	std::string GetShaderSourcesDirectory();
+	std::string GetShaderSourcesDirectory(const std::string& shaderTypeDirectoryName);
+
+	//logs
+	void PurgeLogFile();
+	void WriteToLogFile(const std::string& text);
+
+	//tools
+	bool RunProcess(const std::string& commandLine);
+
+	//shader
+	bool GenerateShaderTextDXIL(const std::string shaderBytecodeFilePath);
+	bool DumpShaderBytecode(const void* bytecode, size_t size, uint64_t hash, const std::string namePrefix, const std::string& directory);
+	bool CompileSourceToDXILBlob(const std::string& shaderSourceFilePath, const std::string& shaderProfile, const std::string& entryPoint, std::string& outBlobPath);
+	bool LoadDXILBlobFromDisk(const std::string& shaderBlobFilePath, std::vector<uint8_t>& outBlob);
+
+	//shader internal resources
+	static const std::string internalMarkerPixelShaderName = "InternalMarkerPixelShader";
+	static const std::string internalNullPixelShaderName = "PixelShaderNull";
+	static const std::string internalMarkerComputeShaderName = "InternalMarkerComputeShader";
+	std::string GetInternalMarkerPixelShaderSourceCodeFilePath();
+	std::string GetInternalMarkerPixelShaderBlobFilePath();
+	std::string GetInternalNullPixelShaderSourceCodeFilePath();
+	std::string GetInternalNullPixelShaderBlobFilePath();
+	std::string GetInternalMarkerComputeShaderSourceCodeFilePath();
+	std::string GetInternalMarkerComputeShaderBlobFilePath();
+	bool WriteInternalShaderSourceCodeToDisk(std::string shaderSourceFileName, const char* shaderSourceCode);
+	bool WriteInternalMarkerPixelShaderSourceCodeToDisk();
+	bool WriteInternalNullPixelShaderSourceCodeToDisk();
+	bool WriteInternalMarkerComputeShaderSourceCodeToDisk();
+
+	//initalize
+	bool Initialize();
+}
