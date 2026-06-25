@@ -27,6 +27,15 @@
     <ClInclude Include="PreCompiledHeader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="DatabaseShaderReplacements.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="DatabaseShaderSources.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="DatabaseGraphicsPSOs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="dsound_proxy.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -96,6 +105,9 @@
     <ClInclude Include="ShaderInjectorSettings.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="DatabaseStreamPSOs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="ShaderInjectorGUI.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -105,6 +117,15 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="DatabaseShaderReplacements.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="DatabaseShaderSources.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="DatabaseGraphicsPSOs.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="PreCompiledHeader.cpp">
@@ -174,6 +195,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ShaderInjectorIO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="DatabaseStreamPSOs.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ShaderTemplates.cpp">

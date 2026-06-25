@@ -39,6 +39,9 @@
 #include "Globals.h"
 #include "dsound_proxy.h"
 #include "HookD3D12.h"
+#include "DatabaseShaderReplacements.h"
+#include "DatabaseGraphicsPSOs.h"
+#include "DatabaseStreamPSOs.h"
 #include "HookInput.h"
 #include "ShaderInjectorIO.h"
 #include "ShaderReplacement.h"
@@ -87,22 +90,13 @@ namespace HookD3D12
 
 	std::vector<PSOPendingRebuild> gPendingRebuilds;
 
-	static std::mutex gPipelineMutex;
-	std::vector<GraphicsPipelineInfo> gGraphicsPipelines;
-	static std::vector<ComputePipelineInfo> gComputePipelines;
+	std::mutex gPipelineMutex;
 	D3D12PipelineInfo gPipelineInfo;
-	std::vector<PipelineStateInfo> gPipelineStates;
 
-	std::vector<ShaderReplacement::ShaderReplacementDisk> gLoadedShaderReplacements;
-	std::vector<std::vector<uint8_t>> gLoadedShaderReplacementBlobs;
 	static std::unordered_map<ID3D12PipelineState*, ID3D12PipelineState*> gPipelineStateOverrides;
 
 	static bool gShaderReplacementApplyDirty = true;
 	static bool gPipelineStateOverridesDirty = true;
-	int gSelectedShaderReplacementIndex = -1;
-	int gShaderReplacementNameBufferIndex = -1;
-	char gShaderReplacementNameBuffer[256]{};
-	bool gLoadedShaderReplacementsOnce = false;
 	ShaderSelectionStyle gShaderSelectionStyle = ShaderSelectionStyle::BluePixelShader;
 
 	void MarkShaderReplacementApplyDirty()
@@ -111,124 +105,10 @@ namespace HookD3D12
 		gPipelineStateOverridesDirty = true;
 	}
 
-	void CaptureGraphicsPipelineState(const D3D12_GRAPHICS_PIPELINE_STATE_DESC* desc, ID3D12PipelineState* pipelineState)
+	void ResetUncapturedReplacementAttempts()
 	{
-		if (!desc || !pipelineState)
-			return;
-
-		GraphicsPipelineInfo info{};
-		info.pipelineState = pipelineState;
-
-		if (desc->VS.pShaderBytecode && desc->VS.BytecodeLength)
-		{
-			info.vsHash = Hash::HashMemory(desc->VS.pShaderBytecode, desc->VS.BytecodeLength);
-			info.vsSize = desc->VS.BytecodeLength;
-			info.vsBytecode.assign((const uint8_t*)desc->VS.pShaderBytecode, (const uint8_t*)desc->VS.pShaderBytecode + desc->VS.BytecodeLength);
-		}
-
-		if (desc->PS.pShaderBytecode && desc->PS.BytecodeLength)
-		{
-			info.psHash = Hash::HashMemory(desc->PS.pShaderBytecode, desc->PS.BytecodeLength);
-			info.psSize = desc->PS.BytecodeLength;
-			info.psBytecode.assign((const uint8_t*)desc->PS.pShaderBytecode, (const uint8_t*)desc->PS.pShaderBytecode + desc->PS.BytecodeLength);
-		}
-
-		if (desc->GS.pShaderBytecode && desc->GS.BytecodeLength)
-		{
-			info.gsHash = Hash::HashMemory(desc->GS.pShaderBytecode, desc->GS.BytecodeLength);
-			info.gsSize = desc->GS.BytecodeLength;
-			info.gsBytecode.assign((const uint8_t*)desc->GS.pShaderBytecode, (const uint8_t*)desc->GS.pShaderBytecode + desc->GS.BytecodeLength);
-		}
-
-		if (desc->HS.pShaderBytecode && desc->HS.BytecodeLength)
-		{
-			info.hsHash = Hash::HashMemory(desc->HS.pShaderBytecode, desc->HS.BytecodeLength);
-			info.hsSize = desc->HS.BytecodeLength;
-			info.hsBytecode.assign((const uint8_t*)desc->HS.pShaderBytecode, (const uint8_t*)desc->HS.pShaderBytecode + desc->HS.BytecodeLength);
-		}
-
-		if (desc->DS.pShaderBytecode && desc->DS.BytecodeLength)
-		{
-			info.dsHash = Hash::HashMemory(desc->DS.pShaderBytecode, desc->DS.BytecodeLength);
-			info.dsSize = desc->DS.BytecodeLength;
-			info.dsBytecode.assign((const uint8_t*)desc->DS.pShaderBytecode, (const uint8_t*)desc->DS.pShaderBytecode + desc->DS.BytecodeLength);
-		}
-
-		info.originalDesc = *desc;
-		info.originalDesc.VS = { info.vsBytecode.empty() ? nullptr : info.vsBytecode.data(), info.vsBytecode.size() };
-		info.originalDesc.PS = { info.psBytecode.empty() ? nullptr : info.psBytecode.data(), info.psBytecode.size() };
-		info.originalDesc.GS = { info.gsBytecode.empty() ? nullptr : info.gsBytecode.data(), info.gsBytecode.size() };
-		info.originalDesc.HS = { info.hsBytecode.empty() ? nullptr : info.hsBytecode.data(), info.hsBytecode.size() };
-		info.originalDesc.DS = { info.dsBytecode.empty() ? nullptr : info.dsBytecode.data(), info.dsBytecode.size() };
-		info.originalDesc.pRootSignature = desc->pRootSignature;
-
-		if (info.originalDesc.pRootSignature)
-			info.originalDesc.pRootSignature->AddRef();
-
-		if (desc->InputLayout.pInputElementDescs && desc->InputLayout.NumElements > 0)
-		{
-			info.inputElements.assign(desc->InputLayout.pInputElementDescs, desc->InputLayout.pInputElementDescs + desc->InputLayout.NumElements);
-			info.originalDesc.InputLayout.pInputElementDescs = info.inputElements.data();
-			info.originalDesc.InputLayout.NumElements = (UINT)info.inputElements.size();
-		}
-		else
-		{
-			info.originalDesc.InputLayout.pInputElementDescs = nullptr;
-			info.originalDesc.InputLayout.NumElements = 0;
-		}
-
-		if (desc->StreamOutput.pSODeclaration && desc->StreamOutput.NumEntries > 0)
-		{
-			info.soDeclarations.assign(desc->StreamOutput.pSODeclaration, desc->StreamOutput.pSODeclaration + desc->StreamOutput.NumEntries);
-			info.originalDesc.StreamOutput.pSODeclaration = info.soDeclarations.data();
-		}
-		else
-		{
-			info.originalDesc.StreamOutput.pSODeclaration = nullptr;
-			info.originalDesc.StreamOutput.NumEntries = 0;
-		}
-
-		if (desc->StreamOutput.pBufferStrides && desc->StreamOutput.NumStrides > 0)
-		{
-			info.soStrides.assign(desc->StreamOutput.pBufferStrides, desc->StreamOutput.pBufferStrides + desc->StreamOutput.NumStrides);
-			info.originalDesc.StreamOutput.pBufferStrides = info.soStrides.data();
-		}
-		else
-		{
-			info.originalDesc.StreamOutput.pBufferStrides = nullptr;
-			info.originalDesc.StreamOutput.NumStrides = 0;
-		}
-
-		info.originalDesc.CachedPSO.pCachedBlob = nullptr;
-		info.originalDesc.CachedPSO.CachedBlobSizeInBytes = 0;
-
-		std::lock_guard<std::mutex> lock(gPipelineMutex);
-		RegisterKnownPipelineStateLocked(pipelineState);
-		gGraphicsPipelines.push_back(info);
-		MarkShaderReplacementApplyDirty();
-	}
-
-
-	void CaptureComputePipelineState(const D3D12_COMPUTE_PIPELINE_STATE_DESC* desc, ID3D12PipelineState* pipelineState, bool registerKnownPipeline)
-	{
-		if (!desc || !pipelineState)
-			return;
-
-		ComputePipelineInfo info{};
-		info.pipelineState = pipelineState;
-
-		if (desc->CS.pShaderBytecode && desc->CS.BytecodeLength)
-		{
-			info.csHash = Hash::HashMemory(desc->CS.pShaderBytecode, desc->CS.BytecodeLength);
-			info.csSize = desc->CS.BytecodeLength;
-		}
-
-		std::lock_guard<std::mutex> lock(gPipelineMutex);
-
-		if (registerKnownPipeline)
-			RegisterKnownPipelineStateLocked(info.pipelineState);
-
-		gComputePipelines.push_back(info);
+		for (auto& uncaptured : gUncapturedPipelineStates)
+			uncaptured.attemptedReplacement = false;
 	}
 
 	void BackfillReplacementCachedBlobInfo(ShaderReplacement::ShaderReplacementDisk& replacement, ID3D12PipelineState* pipelineState)
@@ -424,215 +304,11 @@ namespace HookD3D12
 	}
 
 
-	void RefreshLoadedShaderReplacements()
-	{
-		gLoadedShaderReplacements.clear();
-		gLoadedShaderReplacementBlobs.clear();
-		gSelectedShaderReplacementIndex = -1;
-		gShaderReplacementNameBufferIndex = -1;
-		gShaderReplacementNameBuffer[0] = '\0';
-
-		const std::string replacementDirectory = ShaderInjectorIO::GetShaderReplacementsDirectory();
-
-		if (!ShaderInjectorIO::DirectoryExists(replacementDirectory))
-			ShaderInjectorIO::DirectoryCreate(replacementDirectory);
-
-		std::vector<std::string> jsonFiles;
-		ShaderReplacement::CollectShaderReplacementJsonFiles(replacementDirectory, jsonFiles);
-		std::sort(jsonFiles.begin(), jsonFiles.end());
-
-		for (const std::string& jsonPath : jsonFiles)
-		{
-			ShaderReplacement::ShaderReplacementDisk replacement{};
-
-			if (LoadShaderReplacementJson(jsonPath, replacement))
-			{
-				BackfillReplacementPortableMetadataFromSidecars(replacement);
-				std::vector<uint8_t> modifiedBlob;
-
-				if (!replacement.modifiedShaderBlobPath.empty() && ShaderInjectorIO::FileExists(replacement.modifiedShaderBlobPath))
-					ShaderInjectorIO::LoadDXILBlobFromDisk(replacement.modifiedShaderBlobPath, modifiedBlob);
-
-				gLoadedShaderReplacements.push_back(replacement);
-				gLoadedShaderReplacementBlobs.push_back(modifiedBlob);
-			}
-		}
-
-		if (!gLoadedShaderReplacements.empty())
-			gSelectedShaderReplacementIndex = 0;
-
-		for (auto& uncaptured : gUncapturedPipelineStates)
-			uncaptured.attemptedReplacement = false;
-
-		gLoadedShaderReplacementsOnce = true;
-		MarkShaderReplacementApplyDirty();
-		ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12 | RefreshLoadedShaderReplacements | Loaded shader replacements from disk: " + std::to_string(gLoadedShaderReplacements.size()));
-
-		for (const auto& replacement : gLoadedShaderReplacements)
-		{
-			ShaderInjectorGUI::WriteToRuntimeLog(
-				"Replacement loaded: " + replacement.name +
-				" enabled=" + std::to_string(replacement.enabled ? 1 : 0) +
-				" shaderHash=" + replacement.originalShaderBytecodeHash +
-				" cacheHash=" + replacement.pipelineCachedBlobHash +
-				" cacheBytes=" + replacement.pipelineCachedBlobLength +
-				" source=" + replacement.sourceList +
-				" index=" + replacement.pipelineIndex);
-		}
-	}
-
-	void SyncShaderReplacementNameBuffer()
-	{
-		if (gSelectedShaderReplacementIndex < 0 || gSelectedShaderReplacementIndex >= (int)gLoadedShaderReplacements.size())
-		{
-			gShaderReplacementNameBufferIndex = -1;
-			gShaderReplacementNameBuffer[0] = '\0';
-			return;
-		}
-
-		if (gShaderReplacementNameBufferIndex == gSelectedShaderReplacementIndex)
-			return;
-
-		const std::string& name = gLoadedShaderReplacements[gSelectedShaderReplacementIndex].name;
-		strncpy_s(gShaderReplacementNameBuffer, name.c_str(), _TRUNCATE);
-		gShaderReplacementNameBufferIndex = gSelectedShaderReplacementIndex;
-	}
-
-	bool SaveShaderReplacement(int index)
-	{
-		if (index < 0 || index >= (int)gLoadedShaderReplacements.size())
-			return false;
-
-		ShaderReplacement::ShaderReplacementDisk& replacement = gLoadedShaderReplacements[index];
-		replacement.name = gShaderReplacementNameBuffer;
-
-		if (!WriteShaderReplacementJson(replacement))
-		{
-			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12 | SaveShaderReplacement | failed to save " + replacement.jsonPath);
-			return false;
-		}
-
-		MarkShaderReplacementApplyDirty();
-		ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12 | SaveShaderReplacement | Saved shader replacement: " + replacement.jsonPath);
-		return true;
-	}
-
-	bool CompileShaderReplacement(int index)
-	{
-		if (index < 0 || index >= (int)gLoadedShaderReplacements.size())
-			return false;
-
-		ShaderReplacement::ShaderReplacementDisk& replacement = gLoadedShaderReplacements[index];
-
-		if (!replacement.shaderSourceName.empty())
-			replacement.shaderSourcePath = ShaderInjectorIO::GetShaderSourcesDirectory(ShaderReplacement::ShaderTypeToString(replacement.shaderType) + "s") + "\\" + replacement.shaderSourceName;
-
-		if (replacement.shaderSourcePath.empty() || !ShaderInjectorIO::FileExists(replacement.shaderSourcePath))
-		{
-			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12 | CompileShaderReplacement | source file not found " + replacement.shaderSourcePath);
-			return false;
-		}
-
-		if (replacement.shaderProfile.empty() || replacement.shaderEntryPoint.empty())
-		{
-			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12 | CompileShaderReplacement | shader profile or entry point missing for " + replacement.name);
-			return false;
-		}
-
-		std::string compiledBlobPath = replacement.modifiedShaderBlobPath;
-
-		if (!ShaderInjectorIO::CompileSourceToDXILBlob(replacement.shaderSourcePath, replacement.shaderProfile, replacement.shaderEntryPoint, compiledBlobPath))
-		{
-			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12 | CompileShaderReplacement | compile failed for " + replacement.shaderSourcePath);
-			return false;
-		}
-
-		replacement.modifiedShaderBlobPath = compiledBlobPath;
-		WriteShaderReplacementJson(replacement);
-		ShaderInjectorGUI::WriteToRuntimeLogSuccess("HookD3D12 | CompileShaderReplacement | Compiled shader replacement: " + replacement.name + " -> " + replacement.modifiedShaderBlobPath);
-		return true;
-	}
-
-	bool ReloadShaderReplacement(int index)
-	{
-		if (index < 0 || index >= (int)gLoadedShaderReplacements.size())
-			return false;
-
-		ShaderReplacement::ShaderReplacementDisk& replacement = gLoadedShaderReplacements[index];
-
-		if (index >= (int)gLoadedShaderReplacementBlobs.size())
-			gLoadedShaderReplacementBlobs.resize(gLoadedShaderReplacements.size());
-
-		std::vector<uint8_t> loadedBlob;
-
-		if (replacement.modifiedShaderBlobPath.empty() || !ShaderInjectorIO::LoadDXILBlobFromDisk(replacement.modifiedShaderBlobPath, loadedBlob) || loadedBlob.empty())
-		{
-			gLoadedShaderReplacementBlobs[index].clear();
-			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12 | ReloadShaderReplacement | failed to load compiled blob " + replacement.modifiedShaderBlobPath);
-		}
-		else
-		{
-			gLoadedShaderReplacementBlobs[index] = loadedBlob;
-			ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12 | ReloadShaderReplacement | Reloaded shader replacement: " + replacement.name + " bytes=" + std::to_string(gLoadedShaderReplacementBlobs[index].size()));
-		}
-
-		{
-			std::lock_guard<std::mutex> lock(gPipelineMutex);
-			InvalidateAllReplacementPSOs();
-		}
-
-		MarkShaderReplacementApplyDirty();
-		return !gLoadedShaderReplacementBlobs[index].empty();
-	}
-
-	bool DeleteShaderReplacement(int index)
-	{
-		if (index < 0 || index >= (int)gLoadedShaderReplacements.size())
-			return false;
-
-		ShaderReplacement::ShaderReplacementDisk replacement = gLoadedShaderReplacements[index];
-
-		ShaderInjectorIO::DeleteFileIfExists(replacement.modifiedShaderBlobPath);
-		ShaderInjectorIO::DeleteFileIfExists(replacement.originalShaderBlobPath);
-		ShaderInjectorIO::DeleteFileIfExists(replacement.jsonPath);
-
-		if (!replacement.replacementDirectory.empty() && ShaderInjectorIO::DirectoryExists(replacement.replacementDirectory))
-			RemoveDirectoryA(replacement.replacementDirectory.c_str());
-
-		{
-			std::lock_guard<std::mutex> lock(gPipelineMutex);
-			InvalidateAllReplacementPSOs();
-		}
-
-		ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12 | DeleteShaderReplacement | Deleted shader replacement: " + replacement.name);
-		RefreshLoadedShaderReplacements();
-		MarkShaderReplacementApplyDirty();
-		return true;
-	}
-
 	void GatherPipelineInfo(IDXGISwapChain3* swapChain)
 	{
 		GatherD3D12PipelineInfo(swapChain, gDevice, gCommandQueue, gPipelineInfo);
 	}
-	void CapturePipelineStateStream(const D3D12_PIPELINE_STATE_STREAM_DESC* desc, ID3D12PipelineState* pipelineState)
-	{
-		if (!desc || !desc->pPipelineStateSubobjectStream || desc->SizeInBytes == 0 || !pipelineState)
-			return;
 
-		PipelineStateInfo info{};
-		info.pipelineState = pipelineState;
-
-		const uint8_t* streamStart = (const uint8_t*)desc->pPipelineStateSubobjectStream;
-		info.streamBlob.assign(streamStart, streamStart + desc->SizeInBytes);
-
-		ParsePipelineStream(desc, info);
-
-		std::lock_guard<std::mutex> lock(gPipelineMutex);
-		RegisterKnownPipelineStateLocked(pipelineState);
-		gPipelineStates.push_back(info);
-		RebindPipelineStateInfoPointerFields(gPipelineStates.back());
-		MarkShaderReplacementApplyDirty();
-	}
 
 	void STDMETHODCALLTYPE Hook_SetGraphicsRootSignature(ID3D12GraphicsCommandList* cmdList, ID3D12RootSignature* rootSignature)
 	{

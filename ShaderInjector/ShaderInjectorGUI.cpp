@@ -12,7 +12,7 @@
 #include "ShaderInjectorIO.h"
 #include "Hash.h"
 #include "Globals.h"
-#include "ShaderInjectorGUIShaderSources.h"
+#include "DatabaseShaderSources.h"
 
 namespace ShaderInjectorGUI
 {
@@ -238,7 +238,7 @@ namespace ShaderInjectorGUI
 			ImGui::Spacing();
 			ImGui::Unindent(indentSpace);
 
-			DrawShaderReplacementSourceSection(replacement, HookD3D12::gSelectedShaderReplacementIndex);
+			UI_ShaderReplacementSourceSection(replacement, HookD3D12::gSelectedShaderReplacementIndex);
 
 			ImGui::Spacing();
 
@@ -268,6 +268,62 @@ namespace ShaderInjectorGUI
 
 			ImGui::Unindent(indentSpace);
 		}
+	}
+
+	void UI_ShaderReplacementSourceSection(ShaderReplacement::ShaderReplacementDisk& replacement, int replacementIndex)
+	{
+		DatabaseShaderSources::SyncReplacementShaderSourcePath(replacement);
+
+		if (DatabaseShaderSources::GetShaderSourceListType() != replacement.shaderType)
+			DatabaseShaderSources::RefreshShaderSources(replacement.shaderType);
+
+		ImGui::SeparatorText("Replacement Shaders");
+		ImGui::Indent(indentSpace);
+
+		ImGui::Spacing();
+		ImGui::Text("Source Folder: %s", ShaderInjectorIO::GetShaderSourcesDirectory(DatabaseShaderSources::ShaderSourceSubdirectoryForType(replacement.shaderType)).c_str());
+		ImGui::Text("Source Shader: ");
+		ImGui::SameLine();
+
+		const char* btnLabel = "Refresh Shader Sources";
+		float buttonWidth = ImGui::CalcTextSize(btnLabel).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+		float spacing = ImGui::GetStyle().ItemSpacing.x;
+		float comboWidth = ImGui::GetContentRegionAvail().x - buttonWidth - spacing;
+		ImGui::SetNextItemWidth(comboWidth);
+
+		const char* currentSource = replacement.shaderSourceName.empty() ? "(none)" : replacement.shaderSourceName.c_str();
+		if (ImGui::BeginCombo("##ShaderReplacementSource", currentSource))
+		{
+			for (const std::string& shaderSourceFile : DatabaseShaderSources::GetShaderSourceFiles())
+			{
+				const bool selected = shaderSourceFile == replacement.shaderSourceName;
+
+				if (ImGui::Selectable(shaderSourceFile.c_str(), selected))
+				{
+					replacement.shaderSourceName = shaderSourceFile;
+					replacement.shaderSourcePath = DatabaseShaderSources::ResolveShaderSourcePath(replacement.shaderType, replacement.shaderSourceName);
+				}
+
+				if (selected)
+					ImGui::SetItemDefaultFocus();
+			}
+
+			ImGui::EndCombo();
+		}
+
+		ImGui::SameLine();
+		if (ImGui::Button(btnLabel))
+			DatabaseShaderSources::RefreshShaderSources(replacement.shaderType);
+
+		if (ImGui::Button("Rebuild Shader Replacement"))
+		{
+			HookD3D12::CompileShaderReplacement(replacementIndex);
+			HookD3D12::ReloadShaderReplacement(replacementIndex);
+			HookD3D12::SaveShaderReplacement(replacementIndex);
+		}
+
+		ImGui::Spacing();
+		ImGui::Unindent(indentSpace);
 	}
 
 	void UI_ShaderReplacementPSOList(const ShaderReplacement::ShaderReplacementDisk& replacement)

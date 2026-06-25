@@ -30,7 +30,7 @@ namespace HookD3D12
 
 		if (!createDeviceAddress)
 		{
-			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12 | InstallD3D12CreateDeviceHook | D3D12CreateDevice export not found");
+			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12Install->InstallD3D12CreateDeviceHook: D3D12CreateDevice export not found");
 			return false;
 		}
 
@@ -38,7 +38,7 @@ namespace HookD3D12
 
 		if (createStatus != MH_OK && createStatus != MH_ERROR_ALREADY_CREATED)
 		{
-			ShaderInjectorGUI::WriteToRuntimeLogError(std::string("HookD3D12 | InstallD3D12CreateDeviceHook | D3D12CreateDevice hook create failed: ") + MH_StatusToString(createStatus));
+			ShaderInjectorGUI::WriteToRuntimeLogError(std::string("HookD3D12Install->InstallD3D12CreateDeviceHook: D3D12CreateDevice hook create failed: ") + MH_StatusToString(createStatus));
 			return false;
 		}
 
@@ -46,12 +46,12 @@ namespace HookD3D12
 
 		if (enableStatus != MH_OK && enableStatus != MH_ERROR_ENABLED)
 		{
-			ShaderInjectorGUI::WriteToRuntimeLogError(std::string("HookD3D12 | InstallD3D12CreateDeviceHook | D3D12CreateDevice hook enable failed: ") + MH_StatusToString(enableStatus));
+			ShaderInjectorGUI::WriteToRuntimeLogError(std::string("HookD3D12Install->InstallD3D12CreateDeviceHook: D3D12CreateDevice hook enable failed: ") + MH_StatusToString(enableStatus));
 			return false;
 		}
 
 		checkD3D12CreateDeviceHookInstalled = true;
-		ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12 | InstallD3D12CreateDeviceHook | D3D12CreateDevice hook installed");
+		ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12Install->InstallD3D12CreateDeviceHook: D3D12CreateDevice hook installed");
 		return true;
 	}
 
@@ -71,7 +71,7 @@ namespace HookD3D12
 			if (SUCCEEDED(unknown->QueryInterface(IID_PPV_ARGS(&device))))
 			{
 				InstallPipelineHooksForDevice(device);
-				ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12 | InstallD3D12CreateDeviceHook | D3D12CreateDevice captured device and installed pipeline hooks");
+				ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12Install->Hook_D3D12CreateDevice: D3D12CreateDevice captured device and installed pipeline hooks");
 				device->Release();
 			}
 		}
@@ -113,9 +113,9 @@ namespace HookD3D12
 			MH_STATUS statusCreatePipelineStateEnable = MH_EnableHook(device2VTable[VTableIndex::indexCreatePipelineState]);
 
 			if (statusCreatePipelineStateCreate == MH_OK && statusCreatePipelineStateEnable == MH_OK)
-				ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12 | InstallPipelineHooksForDevice | CreatePipelineState hook installed");
+				ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12Install->InstallPipelineHooksForDevice: CreatePipelineState hook installed");
 			else
-				ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12 | InstallPipelineHooksForDevice | CreatePipelineState hook failed");
+				ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12Install->InstallPipelineHooksForDevice: CreatePipelineState hook failed");
 
 			device2->Release();
 		}
@@ -132,25 +132,25 @@ namespace HookD3D12
 			device1->Release();
 
 			if (statusCreatePipelineLibraryCreate == MH_OK && statusCreatePipelineLibraryEnable == MH_OK)
-				ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12 | InstallPipelineHooksForDevice | CreatePipelineLibrary hook installed");
+				ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12Install->InstallPipelineHooksForDevice: CreatePipelineLibrary hook installed");
 			else
-				ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12 | InstallPipelineHooksForDevice | CreatePipelineLibrary hook failed");
+				ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12Install->InstallPipelineHooksForDevice: CreatePipelineLibrary hook failed");
 		}
 
 		if (statusGraphicsPipelineCreate == MH_OK && statusGraphicsPipelineEnable == MH_OK)
-			ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12 | InstallPipelineHooksForDevice | CreateGraphicsPipelineState hook installed");
+			ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12Install->InstallPipelineHooksForDevice: CreateGraphicsPipelineState hook installed");
 		else
-			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12 | InstallPipelineHooksForDevice | CreateGraphicsPipelineState hook failed");
+			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12Install->InstallPipelineHooksForDevice: CreateGraphicsPipelineState hook failed");
 
 		if (statusComputePipelineCreate == MH_OK && statusComputePipelineEnable == MH_OK)
-			ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12 | InstallPipelineHooksForDevice | CreateComputePipelineState hook installed");
+			ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12Install->InstallPipelineHooksForDevice: CreateComputePipelineState hook installed");
 		else
-			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12 | InstallPipelineHooksForDevice | CreateComputePipelineState hook failed");
+			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12Install->InstallPipelineHooksForDevice: CreateComputePipelineState hook failed");
 
 		if (statusRootSignatureCreate == MH_OK && statusRootSignatureEnable == MH_OK)
-			ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12 | InstallPipelineHooksForDevice | CreateRootSignature hook installed");
+			ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12Install->InstallPipelineHooksForDevice: CreateRootSignature hook installed");
 		else
-			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12 | InstallPipelineHooksForDevice | CreateRootSignature hook failed");
+			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12Install->InstallPipelineHooksForDevice: CreateRootSignature hook failed");
 	}
 
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| INSTALL COMMAND LIST HOOKS |||||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -181,24 +181,24 @@ namespace HookD3D12
 		MH_STATUS setGraphicsRootEnable = MH_EnableHook(commandListVTable[VTableIndex::indexSetGraphicsRootSignature]);
 
 		if (resetCreate == MH_OK && resetEnable == MH_OK)
-			ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12 | InstallCommandListHooksForCommandList | CommandList Reset hook installed");
+			ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12Install->InstallCommandListHooksForCommandList: CommandList Reset hook installed");
 		else
-			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12 | InstallCommandListHooksForCommandList | CommandList Reset hook failed");
+			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12Install->InstallCommandListHooksForCommandList: CommandList Reset hook failed");
 
 		if (setPipelineCreate == MH_OK && setPipelineEnable == MH_OK)
-			ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12 | InstallCommandListHooksForCommandList | SetPipelineState hook installed");
+			ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12Install->InstallCommandListHooksForCommandList: SetPipelineState hook installed");
 		else
-			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12 | InstallCommandListHooksForCommandList | SetPipelineState hook failed");
+			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12Install->InstallCommandListHooksForCommandList: SetPipelineState hook failed");
 
 		if (setComputeRootCreate == MH_OK && setComputeRootEnable == MH_OK)
-			ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12 | InstallCommandListHooksForCommandList | SetComputeRootSignature hook installed");
+			ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12Install->InstallCommandListHooksForCommandList: SetComputeRootSignature hook installed");
 		else
-			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12 | InstallCommandListHooksForCommandList | SetComputeRootSignature hook failed");
+			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12Install->InstallCommandListHooksForCommandList: SetComputeRootSignature hook failed");
 
 		if (setGraphicsRootCreate == MH_OK && setGraphicsRootEnable == MH_OK)
-			ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12 | InstallCommandListHooksForCommandList | SetGraphicsRootSignature hook installed");
+			ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12Install->InstallCommandListHooksForCommandList: SetGraphicsRootSignature hook installed");
 		else
-			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12 | InstallCommandListHooksForCommandList | SetGraphicsRootSignature hook failed");
+			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12Install->InstallCommandListHooksForCommandList: SetGraphicsRootSignature hook failed");
 
 		checkCommandListHookInstalled = true;
 	}

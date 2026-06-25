@@ -3,6 +3,7 @@
 #include <dxgi.h>
 #include <d3d12.h>
 #include <dxgi1_4.h>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -167,6 +168,7 @@ namespace HookD3D12
 	};
 
 	extern std::vector<PSOPendingRebuild> gPendingRebuilds;
+	extern std::mutex gPipelineMutex;
 	extern std::vector<GraphicsPipelineInfo> gGraphicsPipelines;
 	extern D3D12PipelineInfo gPipelineInfo;
 	extern std::vector<PipelineStateInfo> gPipelineStates;
@@ -180,6 +182,8 @@ namespace HookD3D12
 
 	int FindEnabledShaderReplacement(uint64_t shaderHash, ShaderReplacement::ShaderType shaderType);
 	void MarkShaderReplacementApplyDirty();
+	void InvalidateAllReplacementPSOs();
+	void ResetUncapturedReplacementAttempts();
 	void ClearShaderMarkers();
 	void InvalidateShaderMarkerPSOs();
 	void CaptureGraphicsPipelineState(const D3D12_GRAPHICS_PIPELINE_STATE_DESC* desc, ID3D12PipelineState* pipelineState);

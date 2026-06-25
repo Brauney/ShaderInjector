@@ -12,7 +12,6 @@
 #include "ShaderInjectorIO.h"
 #include "Hash.h"
 #include "Globals.h"
-#include "ShaderInjectorGUIShaderSources.h"
 #include "ShaderReplacement.h"
 
 namespace ShaderInjectorGUI
@@ -39,6 +38,8 @@ namespace ShaderInjectorGUI
 
 	template<typename PipelineT>
 	bool PipelineUsesReplacement(const PipelineT& pipeline, const ShaderReplacement::ShaderReplacementDisk& replacement);
+
+	void UI_ShaderReplacementSourceSection(ShaderReplacement::ShaderReplacementDisk& replacement, int replacementIndex);
 
 	template<typename PipelineT>
 	void UI_DrawReplacementPSORow(const char* sourceList, int index, const PipelineT& pipeline);

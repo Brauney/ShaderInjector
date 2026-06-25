@@ -148,6 +148,9 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="FPSCounter.h" />
+    <ClInclude Include="DatabaseShaderReplacements.h" />
+    <ClInclude Include="DatabaseShaderSources.h" />
+    <ClInclude Include="DatabaseGraphicsPSOs.h" />
     <ClInclude Include="Hash.h" />
     <ClInclude Include="HookD3D12.h" />
     <ClInclude Include="HookD3D12OverlayStartup.h" />
@@ -171,14 +174,17 @@
     <ClInclude Include="dsound_proxy.h" />
     <ClInclude Include="ShaderInjectorIO.h" />
     <ClInclude Include="ShaderInjectorSettings.h" />
+    <ClInclude Include="DatabaseStreamPSOs.h" />
     <ClInclude Include="ShaderReplacement.h" />
     <ClInclude Include="ShaderTemplates.h" />
     <ClInclude Include="ShaderInjectorGUI.h" />
-    <ClInclude Include="ShaderInjectorGUIShaderSources.h" />
     <ClInclude Include="VTableIndex.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="FPSCounter.cpp" />
+    <ClCompile Include="DatabaseShaderReplacements.cpp" />
+    <ClCompile Include="DatabaseShaderSources.cpp" />
+    <ClCompile Include="DatabaseGraphicsPSOs.cpp" />
     <ClCompile Include="Hash.cpp" />
     <ClCompile Include="HookD3D12.cpp" />
     <ClCompile Include="HookD3D12Install.cpp" />
@@ -209,10 +215,10 @@
     </ClCompile>
     <ClCompile Include="dsound_proxy.cpp" />
     <ClCompile Include="ShaderInjectorIO.cpp" />
+    <ClCompile Include="DatabaseStreamPSOs.cpp" />
     <ClCompile Include="ShaderReplacement.cpp" />
     <ClCompile Include="ShaderTemplates.cpp" />
     <ClCompile Include="ShaderInjectorGUI.cpp" />
-    <ClCompile Include="ShaderInjectorGUIShaderSources.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
