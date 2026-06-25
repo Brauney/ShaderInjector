@@ -39,6 +39,9 @@
     <ClInclude Include="HookD3D12ReplacementLookup.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="HookD3D12ReplacementTemplates.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="ExternalDependencies\imgui-1.92.8\imgui_internal.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -90,6 +93,9 @@
     <ClInclude Include="ShaderInjectorGUI.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ShaderInjectorGUIShaderSources.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -114,6 +120,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="HookD3D12ReplacementLookup.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="HookD3D12ReplacementTemplates.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ExternalDependencies\imgui-1.92.8\imgui.cpp">
@@ -153,6 +162,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ShaderInjectorGUI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ShaderInjectorGUIShaderSources.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -185,6 +185,7 @@ namespace HookD3D12
 	void CaptureGraphicsPipelineState(const D3D12_GRAPHICS_PIPELINE_STATE_DESC* desc, ID3D12PipelineState* pipelineState);
 	void CaptureComputePipelineState(const D3D12_COMPUTE_PIPELINE_STATE_DESC* desc, ID3D12PipelineState* pipelineState, bool registerKnownPipeline);
 	void CapturePipelineStateStream(const D3D12_PIPELINE_STATE_STREAM_DESC* desc, ID3D12PipelineState* pipelineState);
+	bool GetRootSignatureBlob(ID3D12RootSignature* rootSignature, std::vector<uint8_t>& outBlob, uint64_t& outHash);
 	void RefreshLoadedShaderReplacements();
 	void SyncShaderReplacementNameBuffer();
 	bool SaveShaderReplacement(int index);

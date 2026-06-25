@@ -27,7 +27,7 @@ namespace ShaderInjectorGUI
 	void UI_ShaderInjectorMenu();
 	void UI_ShaderReplacements();
 	void UI_StreamPipelines();
-	void UI_GraphicsPipelines();
+	//void UI_GraphicsPipelines(); //<--- hidden from GUI for now
 	void UI_D3D12PipelineInfo();
 	void UI_AdapterInfo();
 

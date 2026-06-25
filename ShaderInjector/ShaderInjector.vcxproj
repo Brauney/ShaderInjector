@@ -152,6 +152,7 @@
     <ClInclude Include="HookD3D12.h" />
     <ClInclude Include="HookD3D12PipelineUtils.h" />
     <ClInclude Include="HookD3D12ReplacementLookup.h" />
+    <ClInclude Include="HookD3D12ReplacementTemplates.h" />
     <ClInclude Include="ExternalDependencies\imgui-1.92.8\backends\imgui_impl_dx12.h" />
     <ClInclude Include="ExternalDependencies\imgui-1.92.8\backends\imgui_impl_win32.h" />
     <ClInclude Include="ExternalDependencies\imgui-1.92.8\imconfig.h" />
@@ -171,6 +172,7 @@
     <ClInclude Include="ShaderReplacement.h" />
     <ClInclude Include="ShaderTemplates.h" />
     <ClInclude Include="ShaderInjectorGUI.h" />
+    <ClInclude Include="ShaderInjectorGUIShaderSources.h" />
     <ClInclude Include="VTableIndex.h" />
   </ItemGroup>
   <ItemGroup>
@@ -181,6 +183,7 @@
     <ClCompile Include="HookD3D12PipelineLibrary.cpp" />
     <ClCompile Include="HookD3D12PipelineUtils.cpp" />
     <ClCompile Include="HookD3D12ReplacementLookup.cpp" />
+    <ClCompile Include="HookD3D12ReplacementTemplates.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="ExternalDependencies\imgui-1.92.8\backends\imgui_impl_dx12.cpp" />
     <ClCompile Include="ExternalDependencies\imgui-1.92.8\backends\imgui_impl_win32.cpp" />
@@ -202,6 +205,7 @@
     <ClCompile Include="ShaderReplacement.cpp" />
     <ClCompile Include="ShaderTemplates.cpp" />
     <ClCompile Include="ShaderInjectorGUI.cpp" />
+    <ClCompile Include="ShaderInjectorGUIShaderSources.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

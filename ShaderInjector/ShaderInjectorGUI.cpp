@@ -6,14 +6,13 @@
 #include <string>
 #include <vector>
 
-#include <windows.h>
-
 #include "imgui.h"
 
 #include "HookD3D12.h"
 #include "ShaderInjectorIO.h"
 #include "Hash.h"
 #include "Globals.h"
+#include "ShaderInjectorGUIShaderSources.h"
 
 namespace ShaderInjectorGUI
 {
@@ -21,8 +20,6 @@ namespace ShaderInjectorGUI
 	std::string runtimeLogText;
 	static bool injectorDeveloperSettings = false;
 	static int gSelectionStyleIndex = (int)HookD3D12::ShaderSelectionStyle::BluePixelShader;
-	static ShaderReplacement::ShaderType gShaderSourceListType = ShaderReplacement::Unknown;
-	static std::vector<std::string> gShaderSourceFiles;
 
 	void WriteToRuntimeLog(std::string text)
 	{
@@ -34,129 +31,6 @@ namespace ShaderInjectorGUI
 	void ClearRuntimeLog()
 	{
 		runtimeLogText = "";
-	}
-
-	std::string ShaderSourceSubdirectoryForType(ShaderReplacement::ShaderType shaderType)
-	{
-		return ShaderReplacement::ShaderTypeToString(shaderType) + "s";
-	}
-
-	std::string FileNameFromPath(const std::string& path)
-	{
-		const size_t slash = path.find_last_of("\\/");
-		return slash == std::string::npos ? path : path.substr(slash + 1);
-	}
-
-	std::string ResolveShaderSourcePath(ShaderReplacement::ShaderType shaderType, const std::string& shaderSourceName)
-	{
-		if (shaderSourceName.empty())
-			return "";
-
-		return ShaderInjectorIO::GetShaderSourcesDirectory(ShaderSourceSubdirectoryForType(shaderType)) + "\\" + shaderSourceName;
-	}
-
-	void SyncReplacementShaderSourcePath(ShaderReplacement::ShaderReplacementDisk& replacement)
-	{
-		if (replacement.shaderSourceName.empty() && !replacement.shaderSourcePath.empty())
-			replacement.shaderSourceName = FileNameFromPath(replacement.shaderSourcePath);
-
-		if (!replacement.shaderSourceName.empty())
-			replacement.shaderSourcePath = ResolveShaderSourcePath(replacement.shaderType, replacement.shaderSourceName);
-	}
-
-	void RefreshShaderSources(ShaderReplacement::ShaderType shaderType)
-	{
-		gShaderSourceFiles.clear();
-		gShaderSourceListType = shaderType;
-
-		const std::string directory = ShaderInjectorIO::GetShaderSourcesDirectory(ShaderSourceSubdirectoryForType(shaderType));
-		ShaderInjectorIO::DirectoryCreate(ShaderInjectorIO::GetShaderSourcesDirectory());
-		ShaderInjectorIO::DirectoryCreate(directory);
-
-		WIN32_FIND_DATAA findData{};
-		const std::string pattern = directory + "\\*" + ShaderInjectorIO::extensionHLSL;
-		HANDLE findHandle = FindFirstFileA(pattern.c_str(), &findData);
-
-		if (findHandle == INVALID_HANDLE_VALUE)
-			return;
-
-		do
-		{
-			if (!(findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
-				gShaderSourceFiles.push_back(findData.cFileName);
-		} while (FindNextFileA(findHandle, &findData));
-
-		FindClose(findHandle);
-		std::sort(gShaderSourceFiles.begin(), gShaderSourceFiles.end());
-	}
-
-	void DrawShaderReplacementSourceSection(ShaderReplacement::ShaderReplacementDisk& replacement, int replacementIndex)
-	{
-		SyncReplacementShaderSourcePath(replacement);
-
-		if (gShaderSourceListType != replacement.shaderType)
-			RefreshShaderSources(replacement.shaderType);
-
-		ImGui::SeparatorText("Replacement Shaders");
-		ImGui::Indent(indentSpace);
-
-		ImGui::Spacing();
-		ImGui::Text("Source Folder: %s", ShaderInjectorIO::GetShaderSourcesDirectory(ShaderSourceSubdirectoryForType(replacement.shaderType)).c_str());
-		ImGui::Text("Source Shader: ");
-		ImGui::SameLine();
-
-		// Calculate button width so we can leave room for it
-		const char* btnLabel = "Refresh Shader Sources";
-		float buttonWidth = ImGui::CalcTextSize(btnLabel).x + ImGui::GetStyle().FramePadding.x * 2.0f;
-
-		// Spacing between combo and button
-		float spacing = ImGui::GetStyle().ItemSpacing.x;
-
-		// Set combo width to fill remaining space minus the button (and its spacing)
-		float comboWidth = ImGui::GetContentRegionAvail().x - buttonWidth - spacing;
-		ImGui::SetNextItemWidth(comboWidth);
-
-		const char* currentSource = replacement.shaderSourceName.empty() ? "(none)" : replacement.shaderSourceName.c_str();
-		if (ImGui::BeginCombo("##ShaderReplacementSource", currentSource))
-		{
-			for (const std::string& shaderSourceFile : gShaderSourceFiles)
-			{
-				const bool selected = shaderSourceFile == replacement.shaderSourceName;
-
-				if (ImGui::Selectable(shaderSourceFile.c_str(), selected))
-				{
-					replacement.shaderSourceName = shaderSourceFile;
-					replacement.shaderSourcePath = ResolveShaderSourcePath(replacement.shaderType, replacement.shaderSourceName);
-				}
-
-				if (selected)
-					ImGui::SetItemDefaultFocus();
-			}
-
-			ImGui::EndCombo();
-		}
-
-		ImGui::SameLine();
-		if (ImGui::Button(btnLabel))
-			RefreshShaderSources(replacement.shaderType);
-
-		//NOTE: keep this around as being able to set these actions induvidually is helpful
-		//if (ImGui::Button("Save")) HookD3D12::SaveShaderReplacement(replacementIndex);
-		//ImGui::SameLine();
-		//if (ImGui::Button("Compile")) HookD3D12::CompileShaderReplacement(replacementIndex);
-		//ImGui::SameLine();
-		//if (ImGui::Button("Reload")) HookD3D12::ReloadShaderReplacement(replacementIndex);
-
-		//NOTE: combined alltogether in one for better user experience
-		if (ImGui::Button("Rebuild Shader Replacement"))
-		{
-			HookD3D12::CompileShaderReplacement(replacementIndex);
-			HookD3D12::ReloadShaderReplacement(replacementIndex);
-			HookD3D12::SaveShaderReplacement(replacementIndex);
-		}
-
-		ImGui::Spacing();
-		ImGui::Unindent(indentSpace);
 	}
 
 	template<typename PipelineT>
@@ -588,6 +462,10 @@ namespace ShaderInjectorGUI
 		}
 	}
 
+	/*
+	//NOTE: disabled/hidden from the user for now to avoid confusion during setup
+	//and also most of the games shader resources/pso goes through the stream pipeline
+	//KEEP IT AROUND, DON'T REMOVE AS IT WILL STILL BE USEFUL IN THE FUTURE
 	void UI_GraphicsPipelines()
 	{
 		std::string headerText = "Graphics Pipelines: " + std::to_string(HookD3D12::gGraphicsPipelines.size()) + " PSOs";
@@ -610,6 +488,7 @@ namespace ShaderInjectorGUI
 				"Domain Shaders", "GraphicsDS", "Graphics", HookD3D12::gGraphicsPipelines, ShaderReplacement::DomainShader, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DS, HookD3D12::PSOPendingRebuild::SourceList::Graphics, false, nullptr, nullptr);
 		}
 	}
+	*/
 
 	void UI_StreamPipelines()
 	{
@@ -815,7 +694,11 @@ namespace ShaderInjectorGUI
 			ImGui::Spacing();
 
 			UI_StreamPipelines();
-			UI_GraphicsPipelines();
+
+			//NOTE: hidden from GUI for now, even though the app can largly support operations
+			//with the graphics pipeline, for the most part with the game, FF7 rebirth we are primarily
+			//going to be messing with the stream pipeline, and this also will help avoid confusion for users
+			//UI_GraphicsPipelines();
 
 			ImGui::Spacing();
 			ImGui::Unindent(indentSpace);
