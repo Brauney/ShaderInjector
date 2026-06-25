@@ -48,6 +48,8 @@
 #include "HookD3D12PipelineUtils.h"
 #include "HookD3D12ReplacementLookup.h"
 #include "HookD3D12ReplacementTemplates.h"
+#include "HookD3D12OverlayStartup.h"
+#include "HookD3D12PipelineRegistry.h"
 #include "VTableIndex.h"
 
 #if defined _M_X64
@@ -73,36 +75,16 @@ namespace HookD3D12
 	static bool          gInitialized = false;
 	static bool          gShutdown = false;
 	static bool          gOverlayRenderingDisabled = false;
-	static ULONGLONG     gLastResizeBuffersTick = 0;
-	static bool          gLoggedResizeCooldown = false;
 	static bool          gAfterFirstPresent = false;
 	static bool          gLoggedPresentHook = false;
 	static bool          gLoggedPresent1Hook = false;
 	static bool          gLoggedCommandQueueCaptured = false;
 	static bool          gLoggedOverlayInitialized = false;
 
-	static std::unordered_set<ID3D12PipelineState*> gUntrackedBoundPipelineStates;
-	static std::unordered_set<ID3D12PipelineState*> gKnownPipelineStates;
 	static std::vector<UncapturedPipelineStateInfo> gUncapturedPipelineStates;
 	static std::unordered_map<ID3D12GraphicsCommandList*, ID3D12RootSignature*> gCurrentGraphicsRootSignatureByCommandList;
 	static std::unordered_map<ID3D12GraphicsCommandList*, ID3D12RootSignature*> gCurrentComputeRootSignatureByCommandList;
 
-	struct OverlayStartupGateState
-	{
-		HWND outputWindow = nullptr;
-		UINT bufferCount = 0;
-		DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
-		UINT flags = 0;
-		LONG clientWidth = 0;
-		LONG clientHeight = 0;
-		int stableFrames = 0;
-		ULONGLONG firstStableTick = 0;
-	};
-
-	static OverlayStartupGateState gOverlayStartupGate;
-	static constexpr int kOverlayStartupStableFrameLimit = 5;
-	static constexpr ULONGLONG kOverlayStartupMinimumStableMs = 500;
-	static constexpr ULONGLONG kOverlayResizeCooldownMs = 2500;
 	std::vector<PSOPendingRebuild> gPendingRebuilds;
 
 	static std::mutex gPipelineMutex;
@@ -122,136 +104,6 @@ namespace HookD3D12
 	char gShaderReplacementNameBuffer[256]{};
 	bool gLoadedShaderReplacementsOnce = false;
 	ShaderSelectionStyle gShaderSelectionStyle = ShaderSelectionStyle::BluePixelShader;
-
-
-	static void ResetOverlayStartupGate()
-	{
-		gOverlayStartupGate = {};
-	}
-
-	static bool ProbeSwapChainBuffers(IDXGISwapChain3* swapChain, UINT bufferCount)
-	{
-		if (!swapChain || bufferCount == 0)
-			return false;
-
-		for (UINT i = 0; i < bufferCount; ++i)
-		{
-			ID3D12Resource* backBuffer = nullptr;
-			HRESULT hr = swapChain->GetBuffer(i, IID_PPV_ARGS(&backBuffer));
-
-			if (backBuffer)
-				backBuffer->Release();
-
-			if (FAILED(hr))
-				return false;
-		}
-
-		return true;
-	}
-
-	static bool IsSwapChainReadyForOverlayInitialization(IDXGISwapChain3* swapChain, DXGI_SWAP_CHAIN_DESC& outDesc)
-	{
-		outDesc = {};
-
-		if (!swapChain)
-		{
-			ResetOverlayStartupGate();
-			return false;
-		}
-
-		HRESULT hr = swapChain->GetDesc(&outDesc);
-		if (FAILED(hr))
-		{
-			ResetOverlayStartupGate();
-			return false;
-		}
-
-		HWND outputWindow = outDesc.OutputWindow;
-		if (!outputWindow || !IsWindow(outputWindow) || IsIconic(outputWindow))
-		{
-			ResetOverlayStartupGate();
-			return false;
-		}
-
-		if (outDesc.BufferCount == 0 || outDesc.BufferDesc.Format == DXGI_FORMAT_UNKNOWN)
-		{
-			ResetOverlayStartupGate();
-			return false;
-		}
-
-		RECT clientRect{};
-		if (!GetClientRect(outputWindow, &clientRect))
-		{
-			ResetOverlayStartupGate();
-			return false;
-		}
-
-		LONG clientWidth = clientRect.right - clientRect.left;
-		LONG clientHeight = clientRect.bottom - clientRect.top;
-		if (clientWidth <= 0 || clientHeight <= 0)
-		{
-			ResetOverlayStartupGate();
-			return false;
-		}
-
-		ULONGLONG now = GetTickCount64();
-		if (gLastResizeBuffersTick != 0 && now - gLastResizeBuffersTick < kOverlayResizeCooldownMs)
-		{
-			if (!gLoggedResizeCooldown)
-			{
-				ShaderInjectorGUI::WriteToRuntimeLog("[HookD3D12] Resize cooldown active; delaying overlay recreation.");
-				gLoggedResizeCooldown = true;
-			}
-
-			return false;
-		}
-
-		gLoggedResizeCooldown = false;
-
-		bool swapChainChanged =
-			gOverlayStartupGate.outputWindow != outputWindow ||
-			gOverlayStartupGate.bufferCount != outDesc.BufferCount ||
-			gOverlayStartupGate.format != outDesc.BufferDesc.Format ||
-			gOverlayStartupGate.flags != outDesc.Flags ||
-			gOverlayStartupGate.clientWidth != clientWidth ||
-			gOverlayStartupGate.clientHeight != clientHeight;
-
-		if (swapChainChanged)
-		{
-			gOverlayStartupGate.outputWindow = outputWindow;
-			gOverlayStartupGate.bufferCount = outDesc.BufferCount;
-			gOverlayStartupGate.format = outDesc.BufferDesc.Format;
-			gOverlayStartupGate.flags = outDesc.Flags;
-			gOverlayStartupGate.clientWidth = clientWidth;
-			gOverlayStartupGate.clientHeight = clientHeight;
-			gOverlayStartupGate.stableFrames = 1;
-			gOverlayStartupGate.firstStableTick = now;
-			return false;
-		}
-
-		if (!ProbeSwapChainBuffers(swapChain, outDesc.BufferCount))
-		{
-			gOverlayStartupGate.stableFrames = 0;
-			gOverlayStartupGate.firstStableTick = now;
-			return false;
-		}
-
-		++gOverlayStartupGate.stableFrames;
-		return gOverlayStartupGate.stableFrames >= kOverlayStartupStableFrameLimit &&
-			(now - gOverlayStartupGate.firstStableTick) >= kOverlayStartupMinimumStableMs;
-	}
-
-	void RegisterKnownPipelineStateLocked(ID3D12PipelineState* pipelineStateObject)
-	{
-		if (pipelineStateObject)
-			gKnownPipelineStates.insert(pipelineStateObject);
-	}
-
-	void UnregisterKnownPipelineStateLocked(ID3D12PipelineState* pipelineStateObject)
-	{
-		if (pipelineStateObject)
-			gKnownPipelineStates.erase(pipelineStateObject);
-	}
 
 	void MarkShaderReplacementApplyDirty()
 	{
@@ -372,8 +224,10 @@ namespace HookD3D12
 		}
 
 		std::lock_guard<std::mutex> lock(gPipelineMutex);
+
 		if (registerKnownPipeline)
 			RegisterKnownPipelineStateLocked(info.pipelineState);
+
 		gComputePipelines.push_back(info);
 	}
 	void BackfillReplacementCachedBlobInfo(ShaderReplacement::ShaderReplacementDisk& replacement, ID3D12PipelineState* pipelineState)
@@ -384,6 +238,7 @@ namespace HookD3D12
 		uint64_t cachedBlobHash = 0;
 		SIZE_T cachedBlobSize = 0;
 		std::vector<uint8_t> cachedBlob;
+
 		if (GetPipelineCachedBlobInfo(pipelineState, cachedBlobHash, cachedBlobSize, &cachedBlob))
 		{
 			replacement.pipelineCachedBlobHash = Hash::FormatHash(cachedBlobHash);
@@ -620,6 +475,7 @@ namespace HookD3D12
 		uint64_t cachedBlobHash = 0;
 		SIZE_T cachedBlobSize = 0;
 		std::vector<uint8_t> cachedBlob;
+
 		if (GetPipelineCachedBlobInfo(pipelineState, cachedBlobHash, cachedBlobSize, &cachedBlob))
 		{
 			replacement.pipelineCachedBlobHash = Hash::FormatHash(cachedBlobHash);
@@ -637,6 +493,7 @@ namespace HookD3D12
 
 			std::vector<uint8_t> rootSignatureBlob;
 			uint64_t rootSignatureHash = 0;
+
 			if (GetRootSignatureBlob(graphicsInfo->originalDesc.pRootSignature, rootSignatureBlob, rootSignatureHash))
 			{
 				replacement.rootSignatureHash = Hash::FormatHash(rootSignatureHash);
@@ -650,41 +507,54 @@ namespace HookD3D12
 
 			if (!streamInfo->streamBlob.empty())
 				replacement.pipelineStreamBlobPath = replacementDirectory + "\\PipelineStateStream" + ShaderInjectorIO::extensionBIN;
+
 			if (!streamInfo->streamBlob.empty())
 				replacement.pipelineStreamMetadataPath = replacementDirectory + "\\PipelineStateStreamMetadata" + ShaderInjectorIO::extensionJSON;
+
 			std::vector<uint8_t> rootSignatureBlob;
 			uint64_t rootSignatureHash = 0;
+
 			if (GetRootSignatureBlob(streamInfo->rootSignature, rootSignatureBlob, rootSignatureHash))
 			{
 				replacement.rootSignatureHash = Hash::FormatHash(rootSignatureHash);
 				replacement.rootSignatureLength = std::to_string(rootSignatureBlob.size());
 				replacement.rootSignatureBlobPath = replacementDirectory + "\\RootSignatureBlob" + ShaderInjectorIO::extensionBIN;
 			}
+
 			if (!streamInfo->vsBytecode.empty())
 				replacement.vertexShaderBlobPath = replacementDirectory + "\\OriginalVertexShaderBytecode" + ShaderInjectorIO::extensionBIN;
+
 			if (!streamInfo->psBytecode.empty())
 				replacement.pixelShaderBlobPath = replacementDirectory + "\\OriginalPixelShaderBytecode" + ShaderInjectorIO::extensionBIN;
+
 			if (!streamInfo->csBytecode.empty())
 				replacement.computeShaderBlobPath = replacementDirectory + "\\OriginalComputeShaderBytecode" + ShaderInjectorIO::extensionBIN;
+
 			if (!streamInfo->gsBytecode.empty())
 				replacement.geometryShaderBlobPath = replacementDirectory + "\\OriginalGeometryShaderBytecode" + ShaderInjectorIO::extensionBIN;
+
 			if (!streamInfo->hsBytecode.empty())
 				replacement.hullShaderBlobPath = replacementDirectory + "\\OriginalHullShaderBytecode" + ShaderInjectorIO::extensionBIN;
+
 			if (!streamInfo->dsBytecode.empty())
 				replacement.domainShaderBlobPath = replacementDirectory + "\\OriginalDomainShaderBytecode" + ShaderInjectorIO::extensionBIN;
 		}
 
 		bool ok = true;
 		ok = ShaderInjectorIO::WriteBinaryFile(replacement.originalShaderBlobPath, shaderBytecode, shaderBytecodeLength) && ok;
+
 		if (!cachedBlob.empty() && !replacement.pipelineCachedBlobPath.empty())
 			ok = ShaderInjectorIO::WriteBinaryFile(replacement.pipelineCachedBlobPath, cachedBlob.data(), cachedBlob.size()) && ok;
+
 		if (streamInfo && !streamInfo->streamBlob.empty() && !replacement.pipelineStreamBlobPath.empty())
 			ok = ShaderInjectorIO::WriteBinaryFile(replacement.pipelineStreamBlobPath, streamInfo->streamBlob.data(), streamInfo->streamBlob.size()) && ok;
+
 		if (streamInfo && !replacement.pipelineStreamMetadataPath.empty())
 		{
 			ShaderReplacement::ShaderPipelineStreamMetadataDisk metadata = BuildPipelineStreamMetadata(*streamInfo);
 			ok = ShaderReplacement::WritePipelineStreamMetadataJson(replacement.pipelineStreamMetadataPath, metadata) && ok;
 		}
+
 		if (streamInfo && !replacement.rootSignatureBlobPath.empty())
 		{
 			std::vector<uint8_t> rootSignatureBlob;
@@ -692,16 +562,22 @@ namespace HookD3D12
 			if (GetRootSignatureBlob(streamInfo->rootSignature, rootSignatureBlob, rootSignatureHash))
 				ok = ShaderInjectorIO::WriteBinaryFile(replacement.rootSignatureBlobPath, rootSignatureBlob.data(), rootSignatureBlob.size()) && ok;
 		}
+
 		if (streamInfo && !streamInfo->vsBytecode.empty() && !replacement.vertexShaderBlobPath.empty())
 			ok = ShaderInjectorIO::WriteBinaryFile(replacement.vertexShaderBlobPath, streamInfo->vsBytecode.data(), streamInfo->vsBytecode.size()) && ok;
+
 		if (streamInfo && !streamInfo->psBytecode.empty() && !replacement.pixelShaderBlobPath.empty())
 			ok = ShaderInjectorIO::WriteBinaryFile(replacement.pixelShaderBlobPath, streamInfo->psBytecode.data(), streamInfo->psBytecode.size()) && ok;
+
 		if (streamInfo && !streamInfo->csBytecode.empty() && !replacement.computeShaderBlobPath.empty())
 			ok = ShaderInjectorIO::WriteBinaryFile(replacement.computeShaderBlobPath, streamInfo->csBytecode.data(), streamInfo->csBytecode.size()) && ok;
+
 		if (streamInfo && !streamInfo->gsBytecode.empty() && !replacement.geometryShaderBlobPath.empty())
 			ok = ShaderInjectorIO::WriteBinaryFile(replacement.geometryShaderBlobPath, streamInfo->gsBytecode.data(), streamInfo->gsBytecode.size()) && ok;
+
 		if (streamInfo && !streamInfo->hsBytecode.empty() && !replacement.hullShaderBlobPath.empty())
 			ok = ShaderInjectorIO::WriteBinaryFile(replacement.hullShaderBlobPath, streamInfo->hsBytecode.data(), streamInfo->hsBytecode.size()) && ok;
+
 		if (streamInfo && !streamInfo->dsBytecode.empty() && !replacement.domainShaderBlobPath.empty())
 			ok = ShaderInjectorIO::WriteBinaryFile(replacement.domainShaderBlobPath, streamInfo->dsBytecode.data(), streamInfo->dsBytecode.size()) && ok;
 
@@ -732,16 +608,7 @@ namespace HookD3D12
 		const void* shaderBytecode,
 		GraphicsPipelineInfo& pipeline)
 	{
-		return CreateReplacementShaderTemplate(
-			sourceList,
-			pipelineIndex,
-			shaderType,
-			shaderHash,
-			shaderBytecodeLength,
-			shaderBytecode,
-			pipeline.pipelineState,
-			&pipeline,
-			nullptr);
+		return CreateReplacementShaderTemplate(sourceList, pipelineIndex, shaderType, shaderHash, shaderBytecodeLength, shaderBytecode, pipeline.pipelineState, &pipeline, nullptr);
 	}
 
 	bool CreateReplacementShaderTemplateForPipeline(
@@ -753,16 +620,7 @@ namespace HookD3D12
 		const void* shaderBytecode,
 		PipelineStateInfo& pipeline)
 	{
-		return CreateReplacementShaderTemplate(
-			sourceList,
-			pipelineIndex,
-			shaderType,
-			shaderHash,
-			shaderBytecodeLength,
-			shaderBytecode,
-			pipeline.pipelineState,
-			nullptr,
-			&pipeline);
+		return CreateReplacementShaderTemplate(sourceList, pipelineIndex, shaderType, shaderHash, shaderBytecodeLength, shaderBytecode, pipeline.pipelineState, nullptr, &pipeline);
 	}
 
 	void RefreshLoadedShaderReplacements()
@@ -905,6 +763,7 @@ namespace HookD3D12
 			gLoadedShaderReplacementBlobs.resize(gLoadedShaderReplacements.size());
 
 		std::vector<uint8_t> loadedBlob;
+
 		if (replacement.modifiedShaderBlobPath.empty() || !ShaderInjectorIO::LoadDXILBlobFromDisk(replacement.modifiedShaderBlobPath, loadedBlob) || loadedBlob.empty())
 		{
 			gLoadedShaderReplacementBlobs[index].clear();
@@ -973,13 +832,6 @@ namespace HookD3D12
 		RebindPipelineStateInfoPointerFields(gPipelineStates.back());
 		MarkShaderReplacementApplyDirty();
 	}
-
-
-	bool IsKnownPipelineStateLocked(ID3D12PipelineState* pso)
-	{
-		return !pso || gKnownPipelineStates.find(pso) != gKnownPipelineStates.end();
-	}
-
 
 	void STDMETHODCALLTYPE Hook_SetGraphicsRootSignature(ID3D12GraphicsCommandList* cmdList, ID3D12RootSignature* rootSignature)
 	{
@@ -1052,6 +904,7 @@ namespace HookD3D12
 			std::string path = ShaderInjectorIO::GetUncapturedPSODirectory() + "\\UncapturedPSO_" + Hash::FormatHash(info.cachedBlobHash) + "_" + pointerText + ShaderInjectorIO::extensionBIN;
 			ShaderInjectorIO::WriteBinaryFile(path, info.cachedBlob.data(), info.cachedBlob.size());
 		}
+
 		gUncapturedPipelineStates.push_back(info);
 
 		char buffer[384];
@@ -1062,6 +915,7 @@ namespace HookD3D12
 			pipelineState,
 			info.cachedBlobHash ? Hash::FormatHash(info.cachedBlobHash).c_str() : "<none>",
 			(size_t)info.cachedBlobSize);
+
 		ShaderInjectorGUI::WriteToRuntimeLog(buffer);
 
 		if (info.cachedBlobHash)
@@ -1086,7 +940,7 @@ namespace HookD3D12
 			if (gPipelineStateOverridesDirty)
 				RebuildPipelineStateOverrideMap();
 
-			if (pso && !IsKnownPipelineStateLocked(pso) && gUntrackedBoundPipelineStates.insert(pso).second)
+			if (!IsKnownPipelineStateLocked(pso) && MarkUntrackedBoundPipelineStateLocked(pso))
 				RecordUncapturedPipelineStateLocked(cmdList, pso, "SetPipelineState bound");
 
 			auto overrideIt = gPipelineStateOverrides.find(pso);
@@ -1118,10 +972,11 @@ namespace HookD3D12
 			if (gPipelineStateOverridesDirty)
 				RebuildPipelineStateOverrideMap();
 
-			if (initialState && !IsKnownPipelineStateLocked(initialState) && gUntrackedBoundPipelineStates.insert(initialState).second)
+			if (!IsKnownPipelineStateLocked(initialState) && MarkUntrackedBoundPipelineStateLocked(initialState))
 				RecordUncapturedPipelineStateLocked(cmdList, initialState, "CommandList Reset bound initial");
 
 			auto overrideIt = gPipelineStateOverrides.find(initialState);
+
 			if (overrideIt != gPipelineStateOverrides.end() && overrideIt->second)
 				boundState = overrideIt->second;
 		}
@@ -1341,8 +1196,6 @@ namespace HookD3D12
 	{
 		HRESULT hr = Original_CreatePipelineState(device, desc, riid, ppPipelineState);
 
-		//MessageBoxA(nullptr, "hit", "PipelineState", MB_OK);
-
 		//NOTE: haven't hit any of these yet, seems to pass
 		if (FAILED(hr))
 		{
@@ -1397,6 +1250,7 @@ namespace HookD3D12
 
 		// QI for Device2 which has CreatePipelineState
 		ID3D12Device2* device2 = nullptr;
+
 		if (FAILED(device->QueryInterface(IID_PPV_ARGS(&device2))))
 		{
 			ShaderInjectorGUI::WriteToRuntimeLog("[HookD3D12]: RebuildStreamPSOWithoutStage() Failed QueryInterface for Device2");
@@ -1548,10 +1402,13 @@ namespace HookD3D12
 			auto type = *reinterpret_cast<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE*>(ptr);
 			UINT typeIdx = (UINT)type;
 
-			if (typeIdx >= ARRAYSIZE(kSubobjectSizes)) break;
+			if (typeIdx >= ARRAYSIZE(kSubobjectSizes)) 
+				break;
 
 			size_t subobjectSize = kSubobjectSizes[typeIdx];
-			if (ptr + subobjectSize > end) break;
+
+			if (ptr + subobjectSize > end) 
+				break;
 
 			if (type == D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_INPUT_LAYOUT)
 			{
@@ -1665,6 +1522,7 @@ namespace HookD3D12
 
 		const bool compiledBlobAvailable = replacementIndex < (int)gLoadedShaderReplacementBlobs.size() && !gLoadedShaderReplacementBlobs[replacementIndex].empty();
 		const bool compiledBlobOnDisk = !replacement.modifiedShaderBlobPath.empty() && ShaderInjectorIO::FileExists(replacement.modifiedShaderBlobPath);
+		
 		if (pipeline.psoWithReplacement && pipeline.activeShaderReplacementName == replacement.name && pipeline.activeShaderReplacementHash == shaderHash && pipeline.activeShaderReplacementType == shaderType)
 		{
 			if (!pipeline.activeShaderReplacementUsesFallback || (!compiledBlobAvailable && !compiledBlobOnDisk))
@@ -1714,7 +1572,6 @@ namespace HookD3D12
 
 		HRESULT hr = Original_CreateGraphicsPipelineState(gDevice, &desc, IID_PPV_ARGS(&pipeline.psoWithReplacement));
 
-
 		if (FAILED(hr))
 		{
 			ShaderInjectorGUI::WriteToRuntimeLog("RebuildGraphicsPSOWithReplacement: failed hr=" + std::to_string((unsigned)hr) + " replacement=" + replacement.name);
@@ -1742,6 +1599,7 @@ namespace HookD3D12
 
 		const bool compiledBlobAvailable = replacementIndex < (int)gLoadedShaderReplacementBlobs.size() && !gLoadedShaderReplacementBlobs[replacementIndex].empty();
 		const bool compiledBlobOnDisk = !replacement.modifiedShaderBlobPath.empty() && ShaderInjectorIO::FileExists(replacement.modifiedShaderBlobPath);
+		
 		if (pipeline.psoWithReplacement && pipeline.activeShaderReplacementName == replacement.name && pipeline.activeShaderReplacementHash == shaderHash && pipeline.activeShaderReplacementType == shaderType)
 		{
 			if (!pipeline.activeShaderReplacementUsesFallback || (!compiledBlobAvailable && !compiledBlobOnDisk))
@@ -1766,10 +1624,12 @@ namespace HookD3D12
 		}
 
 		const D3D12_PIPELINE_STATE_SUBOBJECT_TYPE targetType = SubobjectTypeForShaderType(shaderType);
+		
 		if (targetType == D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_MAX_VALID)
 			return false;
 
 		ID3D12Device2* device2 = nullptr;
+		
 		if (FAILED(gDevice->QueryInterface(IID_PPV_ARGS(&device2))))
 			return false;
 
@@ -1813,6 +1673,7 @@ namespace HookD3D12
 			if (type == D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_ROOT_SIGNATURE)
 			{
 				ID3D12RootSignature** rootSignature = reinterpret_cast<ID3D12RootSignature**>(payloadPtr);
+
 				if (rootSignatureOverride)
 					*rootSignature = rootSignatureOverride;
 				else if (!pipeline.pipelineState)
@@ -1876,7 +1737,6 @@ namespace HookD3D12
 		patchedDesc.SizeInBytes = patchedBlob.size();
 
 		HRESULT hr = CreatePipelineStateInternal(device2, &patchedDesc, IID_PPV_ARGS(&pipeline.psoWithReplacement));
-
 
 		device2->Release();
 
@@ -1955,6 +1815,7 @@ namespace HookD3D12
 		ShaderReplacement::ShaderReplacementDisk templateReplacement{};
 		std::string selectedTemplateName;
 		SIZE_T selectedTemplateMatchingBytes = 0;
+
 		if (!SelectPersistedPipelineTemplateForUncaptured(replacement, uncaptured, templateReplacement, selectedTemplateName, selectedTemplateMatchingBytes))
 			return false;
 
@@ -1964,11 +1825,13 @@ namespace HookD3D12
 		const std::string templateLogSuffix = selectedTemplateName.empty() ? std::string() : (" template=" + selectedTemplateName + " matchBytes=" + std::to_string((size_t)selectedTemplateMatchingBytes));
 
 		PipelineStateInfo persistedPipeline{};
+
 		if (!LoadPersistedStreamTemplateFromReplacement(templateReplacement, persistedPipeline))
 			return false;
 
 		ID3D12RootSignature* observedRootSignature = nullptr;
 		const bool preferComputeRootSignature = shaderType == ShaderReplacement::ComputeShader || (persistedPipeline.isCompute && !persistedPipeline.isGraphics);
+		
 		if (preferComputeRootSignature)
 			observedRootSignature = uncaptured.observedComputeRootSignature ? uncaptured.observedComputeRootSignature : uncaptured.observedGraphicsRootSignature;
 		else
@@ -2056,6 +1919,7 @@ namespace HookD3D12
 						continue;
 
 					enabledCount++;
+
 					if (!replacement.pipelineCachedBlobHash.empty())
 						cachedHashCount++;
 				}
@@ -2084,6 +1948,7 @@ namespace HookD3D12
 		if (replacement.sourceList == "Graphics" && !replacement.pipelineIndex.empty())
 		{
 			const int pipelineIndex = atoi(replacement.pipelineIndex.c_str());
+
 			if (pipelineIndex >= 0 && pipelineIndex < (int)gGraphicsPipelines.size())
 			{
 				GraphicsPipelineInfo& pipeline = gGraphicsPipelines[pipelineIndex];
@@ -2103,6 +1968,7 @@ namespace HookD3D12
 		if (replacement.sourceList == "Stream" && !replacement.pipelineIndex.empty())
 		{
 			const int pipelineIndex = atoi(replacement.pipelineIndex.c_str());
+
 			if (pipelineIndex >= 0 && pipelineIndex < (int)gPipelineStates.size())
 			{
 				PipelineStateInfo& pipeline = gPipelineStates[pipelineIndex];
@@ -2211,11 +2077,11 @@ namespace HookD3D12
 					//NOTE: rebuild!
 					D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = p.originalDesc;
 					desc.VS = { p.vsBytecode.empty() ? nullptr : p.vsBytecode.data(), p.vsBytecode.size() };
-					//desc.PS = { p.psBytecode.empty() ? nullptr : p.psBytecode.data(), p.psBytecode.size() }; //keep this comment, but this line feeds back in original parsed bytecode. important test to verify if we can rebuild using the original bytecode
+
 					const bool hiddenSelection = gShaderSelectionStyle == ShaderSelectionStyle::Hidden;
 					const std::vector<uint8_t>& markerBlob = !Globals::markerPixelShaderBlob.empty() ? Globals::markerPixelShaderBlob : Globals::nullPixelShaderBlob;
 					desc.PS = hiddenSelection || markerBlob.empty() ? D3D12_SHADER_BYTECODE{ nullptr, 0 } : D3D12_SHADER_BYTECODE{ markerBlob.data(), markerBlob.size() };
-					//desc.PS = { kNullPS, sizeof(kNullPS) }; //get an issue here with our custom shader
+					
 					desc.InputLayout.pInputElementDescs = p.inputElements.empty() ? nullptr : p.inputElements.data();
 					desc.InputLayout.NumElements = (UINT)p.inputElements.size();
 					desc.StreamOutput.pSODeclaration = p.soDeclarations.empty() ? nullptr : p.soDeclarations.data();
@@ -2227,6 +2093,7 @@ namespace HookD3D12
 					//EXTREMELY IMPORTANT NOTE: we call the original function here, not through device-> otherwise we create a recursion loop and create a fatal application error
 					//HRESULT hr = gDevice->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&p.psoWithoutPS)); //<-- causes recursion madness
 					HRESULT hr = Original_CreateGraphicsPipelineState(gDevice, &desc, IID_PPV_ARGS(&p.psoWithoutPS));
+
 					if (SUCCEEDED(hr))
 						RegisterKnownPipelineStateLocked(p.psoWithoutPS);
 
@@ -2268,6 +2135,7 @@ namespace HookD3D12
 							desc.PrimitiveTopologyType,
 							desc.BlendState.RenderTarget[0].BlendEnable
 						);
+
 						MessageBoxA(nullptr, dbg, "PSO Rebuild Desc", MB_OK);
 					}
 				}
@@ -2619,6 +2487,7 @@ namespace HookD3D12
 			//=========================================== IMGUI END ===========================================
 
 			UINT frameIdx = pSwapChain->GetCurrentBackBufferIndex();
+
 			if (!gFrameContexts || gBufferCount == 0 || frameIdx >= gBufferCount)
 			{
 				ImGui::EndFrame();
@@ -2626,6 +2495,7 @@ namespace HookD3D12
 			}
 
 			FrameContext& ctx = gFrameContexts[frameIdx];
+
 			if (!ctx.allocator || !ctx.renderTarget)
 			{
 				ImGui::EndFrame();
@@ -2827,9 +2697,7 @@ namespace HookD3D12
 
 		++gOverlayFenceValue;
 
-		HRESULT hr = gCommandQueue->Signal(
-			gOverlayFence,
-			gOverlayFenceValue);
+		HRESULT hr = gCommandQueue->Signal(gOverlayFence, gOverlayFenceValue);
 
 		if (FAILED(hr))
 		{
@@ -2840,9 +2708,7 @@ namespace HookD3D12
 		if (gOverlayFence->GetCompletedValue() >= gOverlayFenceValue)
 			return true;
 
-		hr = gOverlayFence->SetEventOnCompletion(
-			gOverlayFenceValue,
-			gFenceEvent);
+		hr = gOverlayFence->SetEventOnCompletion(gOverlayFenceValue, gFenceEvent);
 
 		if (FAILED(hr))
 		{
@@ -2851,6 +2717,7 @@ namespace HookD3D12
 		}
 
 		DWORD waitResult = WaitForSingleObject(gFenceEvent, timeoutMs);
+
 		if (waitResult != WAIT_OBJECT_0)
 		{
 			ShaderInjectorGUI::WriteToRuntimeLog("[HookD3D12] Overlay fence wait timed out during resize teardown; releasing overlay resources anyway.");
@@ -2937,19 +2804,14 @@ namespace HookD3D12
 		// Release every overlay object that depends on swap-chain buffers or descriptor heaps before ResizeBuffers.
 		// ImGui owns a font texture/SRV through the DX12 backend, so a partial back-buffer release can corrupt the UI after resize.
 		gOverlayRenderingDisabled = true;
+
 		if (gInitialized || gFrameContexts || gHeapRTV || gHeapSRV || gCommandList)
 		{
 			WaitForOverlayGPUIdle();
 			ReleaseOverlaySwapChainResources(true);
 		}
 
-		HRESULT hr = Original_ResizeBuffersD3D12(
-			pSwapChain,
-			BufferCount,
-			Width,
-			Height,
-			NewFormat,
-			SwapChainFlags);
+		HRESULT hr = Original_ResizeBuffersD3D12(pSwapChain, BufferCount, Width, Height, NewFormat, SwapChainFlags);
 
 		if (FAILED(hr))
 		{
@@ -2967,9 +2829,7 @@ namespace HookD3D12
 		gBufferCount = 0;
 		gInitialized = false;
 		gOverlayRenderingDisabled = false;
-		gLastResizeBuffersTick = GetTickCount64();
-		gLoggedResizeCooldown = false;
-		ResetOverlayStartupGate();
+		NotifyOverlayResizeBuffersSucceeded();
 
 		ShaderInjectorGUI::WriteToRuntimeLog("[HookD3D12] ResizeBuffers succeeded. Overlay recreation deferred until resize settles.");
 

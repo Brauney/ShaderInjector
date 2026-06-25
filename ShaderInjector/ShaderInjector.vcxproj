@@ -150,6 +150,8 @@
     <ClInclude Include="FPSCounter.h" />
     <ClInclude Include="Hash.h" />
     <ClInclude Include="HookD3D12.h" />
+    <ClInclude Include="HookD3D12OverlayStartup.h" />
+    <ClInclude Include="HookD3D12PipelineRegistry.h" />
     <ClInclude Include="HookD3D12PipelineUtils.h" />
     <ClInclude Include="HookD3D12ReplacementLookup.h" />
     <ClInclude Include="HookD3D12ReplacementTemplates.h" />
@@ -180,6 +182,8 @@
     <ClCompile Include="Hash.cpp" />
     <ClCompile Include="HookD3D12.cpp" />
     <ClCompile Include="HookD3D12Install.cpp" />
+    <ClCompile Include="HookD3D12OverlayStartup.cpp" />
+    <ClCompile Include="HookD3D12PipelineRegistry.cpp" />
     <ClCompile Include="HookD3D12Originals.cpp" />
     <ClCompile Include="HookD3D12PipelineLibrary.cpp" />
     <ClCompile Include="HookD3D12PipelineUtils.cpp" />

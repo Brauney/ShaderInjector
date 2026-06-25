@@ -33,6 +33,12 @@
     <ClInclude Include="HookD3D12.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="HookD3D12OverlayStartup.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="HookD3D12PipelineRegistry.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="HookD3D12PipelineUtils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -111,6 +117,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="HookD3D12Install.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="HookD3D12OverlayStartup.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="HookD3D12PipelineRegistry.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="HookD3D12Originals.cpp">
