@@ -31,7 +31,7 @@ namespace ShaderInjectorGUI
 		DrawMenuFn drawMenu = nullptr;
 	};
 
-	void UI_MainWindow(const MainWindowContext& context);
+	void DrawMainWindow(const MainWindowContext& context);
 	void UI_ShaderInjectorMenu();
 
 	//===================== shader replacements =====================
@@ -84,5 +84,7 @@ namespace ShaderInjectorGUI
 
 	void UI_RuntimeLogTextBox(const std::string* logText);
 	void WriteToRuntimeLog(std::string text);
+	void WriteToRuntimeLogError(std::string text);
+	void WriteToRuntimeLogSuccess(std::string text);
 	void ClearRuntimeLog();
 }

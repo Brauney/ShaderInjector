@@ -4,8 +4,6 @@
 #include <string>
 #include <vector>
 
-#include <windows.h>
-
 #include "imgui.h"
 
 #include "HookD3D12.h"
@@ -22,12 +20,6 @@ namespace ShaderInjectorGUI
 		return ShaderReplacement::ShaderTypeToString(shaderType) + "s";
 	}
 
-	static std::string FileNameFromPath(const std::string& path)
-	{
-		const size_t slash = path.find_last_of("\\/");
-		return slash == std::string::npos ? path : path.substr(slash + 1);
-	}
-
 	static std::string ResolveShaderSourcePath(ShaderReplacement::ShaderType shaderType, const std::string& shaderSourceName)
 	{
 		if (shaderSourceName.empty())
@@ -39,7 +31,7 @@ namespace ShaderInjectorGUI
 	static void SyncReplacementShaderSourcePath(ShaderReplacement::ShaderReplacementDisk& replacement)
 	{
 		if (replacement.shaderSourceName.empty() && !replacement.shaderSourcePath.empty())
-			replacement.shaderSourceName = FileNameFromPath(replacement.shaderSourcePath);
+			replacement.shaderSourceName = ShaderInjectorIO::FileNameFromPath(replacement.shaderSourcePath);
 
 		if (!replacement.shaderSourceName.empty())
 			replacement.shaderSourcePath = ResolveShaderSourcePath(replacement.shaderType, replacement.shaderSourceName);
@@ -54,20 +46,7 @@ namespace ShaderInjectorGUI
 		ShaderInjectorIO::DirectoryCreate(ShaderInjectorIO::GetShaderSourcesDirectory());
 		ShaderInjectorIO::DirectoryCreate(directory);
 
-		WIN32_FIND_DATAA findData{};
-		const std::string pattern = directory + "\\*" + ShaderInjectorIO::extensionHLSL;
-		HANDLE findHandle = FindFirstFileA(pattern.c_str(), &findData);
-
-		if (findHandle == INVALID_HANDLE_VALUE)
-			return;
-
-		do
-		{
-			if (!(findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
-				gShaderSourceFiles.push_back(findData.cFileName);
-		} while (FindNextFileA(findHandle, &findData));
-
-		FindClose(findHandle);
+		ShaderInjectorIO::CollectFilesByExtension(directory, ShaderInjectorIO::extensionHLSL, gShaderSourceFiles, false, false);
 		std::sort(gShaderSourceFiles.begin(), gShaderSourceFiles.end());
 	}
 

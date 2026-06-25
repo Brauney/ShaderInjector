@@ -49,10 +49,10 @@ namespace Hooks
 	// Create hidden Window + device + DX12 swapchain
 	static HRESULT CreateDeviceAndSwapChain()
 	{
-		ShaderInjectorIO::WriteToLogFile("hooks | creating device and swap chain...");
+		ShaderInjectorIO::WriteToLogFile("Hooks | CreateDeviceAndSwapChain | creating device and swap chain...");
 
 		//============================== 1) Register dummy window ==============================
-		ShaderInjectorIO::WriteToLogFile("hooks | registering dummy window...");
+		ShaderInjectorIO::WriteToLogFile("Hooks | CreateDeviceAndSwapChain | registering dummy window...");
 
 		WNDCLASSEXW windowClass = 
 		{
@@ -70,14 +70,14 @@ namespace Hooks
 		{
 			//NOTE: keep this comment around for sanity check please!
 			char buffer[256];
-			sprintf_s(buffer, "hooks | RegisterClassExW failed: %u\n", GetLastError());
-			ShaderInjectorIO::WriteToLogFile(buffer);
+			sprintf_s(buffer, "Hooks | CreateDeviceAndSwapChain | RegisterClassExW failed: %u\n", GetLastError());
+			ShaderInjectorIO::WriteToLogFileError(buffer);
 			return E_FAIL;
 		}
 
-		ShaderInjectorIO::WriteToLogFile("hooks | registered dummy window!");
+		ShaderInjectorIO::WriteToLogFile("Hooks | CreateDeviceAndSwapChain | registered dummy window!");
 		//============================== 2) Create hidden window ==============================
-		ShaderInjectorIO::WriteToLogFile("hooks | creating hidden window...");
+		ShaderInjectorIO::WriteToLogFile("Hooks | CreateDeviceAndSwapChain | creating hidden window...");
 
 		hDummyWindow = CreateWindowExW(
 			0, dummyClassName, L"Dummy",
@@ -89,14 +89,14 @@ namespace Hooks
 		if (!hDummyWindow) 
 		{
 			char buffer[256];
-			sprintf_s(buffer, "hooks | CreateWindowExW failed: %u\n", GetLastError());
-			ShaderInjectorIO::WriteToLogFile(buffer);
+			sprintf_s(buffer, "Hooks | CreateDeviceAndSwapChain | CreateWindowExW failed: %u\n", GetLastError());
+			ShaderInjectorIO::WriteToLogFileError(buffer);
 			return E_FAIL;
 		}
 
-		ShaderInjectorIO::WriteToLogFile("hooks | created hidden window!");
+		ShaderInjectorIO::WriteToLogFile("Hooks | CreateDeviceAndSwapChain | created hidden window!");
 		//============================== 3) Factory DXGI ==============================
-		ShaderInjectorIO::WriteToLogFile("hooks | CreateDXGIFactory1...");
+		ShaderInjectorIO::WriteToLogFile("Hooks | CreateDeviceAndSwapChain | CreateDXGIFactory1...");
 
 		Microsoft::WRL::ComPtr<IDXGIFactory4> dxgiFactory4;
 		HRESULT dxgiFactory4Result = CreateDXGIFactory1(IID_PPV_ARGS(&dxgiFactory4));
@@ -104,28 +104,28 @@ namespace Hooks
 		if (FAILED(dxgiFactory4Result))
 		{
 			char buffer[256];
-			sprintf_s(buffer, "hooks | CreateDXGIFactory1 failed: 0x%08X\n", dxgiFactory4Result);
-			ShaderInjectorIO::WriteToLogFile(buffer);
+			sprintf_s(buffer, "Hooks | CreateDeviceAndSwapChain | CreateDXGIFactory1 failed: 0x%08X\n", dxgiFactory4Result);
+			ShaderInjectorIO::WriteToLogFileError(buffer);
 			return dxgiFactory4Result;
 		}
 
-		ShaderInjectorIO::WriteToLogFile("hooks | CreateDXGIFactory1 Success!");
+		ShaderInjectorIO::WriteToLogFile("Hooks | CreateDeviceAndSwapChain | CreateDXGIFactory1 Success!");
 		//============================== 4) Device D3D12 ==============================
-		ShaderInjectorIO::WriteToLogFile("hooks | D3D12CreateDevice...");
+		ShaderInjectorIO::WriteToLogFile("Hooks | CreateDeviceAndSwapChain | D3D12CreateDevice...");
 
 		HRESULT createdD3D12DeviceResult = D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&pDevice));
 
 		if (FAILED(createdD3D12DeviceResult))
 		{
 			char buffer[256];
-			sprintf_s(buffer, "hooks | D3D12CreateDevice failed: 0x%08X\n", createdD3D12DeviceResult);
-			ShaderInjectorIO::WriteToLogFile(buffer);
+			sprintf_s(buffer, "Hooks | CreateDeviceAndSwapChain | D3D12CreateDevice failed: 0x%08X\n", createdD3D12DeviceResult);
+			ShaderInjectorIO::WriteToLogFileError(buffer);
 			return createdD3D12DeviceResult;
 		}
 
-		ShaderInjectorIO::WriteToLogFile("hooks | D3D12CreateDevice Success!");
+		ShaderInjectorIO::WriteToLogFile("Hooks | CreateDeviceAndSwapChain | D3D12CreateDevice Success!");
 		//============================== 5) Command Queue ==============================
-		ShaderInjectorIO::WriteToLogFile("hooks | CreateCommandQueue...");
+		ShaderInjectorIO::WriteToLogFile("Hooks | CreateDeviceAndSwapChain | CreateCommandQueue...");
 
 		D3D12_COMMAND_QUEUE_DESC commandQueueDescription = {};
 		commandQueueDescription.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
@@ -135,14 +135,14 @@ namespace Hooks
 		if (FAILED(createCommandQueueResult))
 		{
 			char buffer[256];
-			sprintf_s(buffer, "hooks | CreateCommandQueue failed: 0x%08X\n", createCommandQueueResult);
-			ShaderInjectorIO::WriteToLogFile(buffer);
+			sprintf_s(buffer, "Hooks | CreateDeviceAndSwapChain | CreateCommandQueue failed: 0x%08X\n", createCommandQueueResult);
+			ShaderInjectorIO::WriteToLogFileError(buffer);
 			return createCommandQueueResult;
 		}
 
-		ShaderInjectorIO::WriteToLogFile("hooks | CreateCommandQueue Success!");
+		ShaderInjectorIO::WriteToLogFile("Hooks | CreateDeviceAndSwapChain | CreateCommandQueue Success!");
 		//============================== 6) Command List ==============================
-		ShaderInjectorIO::WriteToLogFile("hooks | CreateCommandAllocator...");
+		ShaderInjectorIO::WriteToLogFile("Hooks | CreateDeviceAndSwapChain | CreateCommandAllocator...");
 
 		HRESULT createCommandAllocatorResult = pDevice->CreateCommandAllocator(
 			D3D12_COMMAND_LIST_TYPE_DIRECT,
@@ -151,14 +151,14 @@ namespace Hooks
 		if (FAILED(createCommandAllocatorResult))
 		{
 			char buffer[256];
-			sprintf_s(buffer, "hooks | CreateCommandAllocator failed: 0x%08X\n", createCommandAllocatorResult);
-			ShaderInjectorIO::WriteToLogFile(buffer);
+			sprintf_s(buffer, "Hooks | CreateDeviceAndSwapChain | CreateCommandAllocator failed: 0x%08X\n", createCommandAllocatorResult);
+			ShaderInjectorIO::WriteToLogFileError(buffer);
 			return createCommandAllocatorResult;
 		}
 
-		ShaderInjectorIO::WriteToLogFile("hooks | CreateCommandAllocator Success!");
+		ShaderInjectorIO::WriteToLogFile("Hooks | CreateDeviceAndSwapChain | CreateCommandAllocator Success!");
 		//============================== 7) Command List ==============================
-		ShaderInjectorIO::WriteToLogFile("hooks | CreateCommandList...");
+		ShaderInjectorIO::WriteToLogFile("Hooks | CreateDeviceAndSwapChain | CreateCommandList...");
 
 		HRESULT createCommandListResult = pDevice->CreateCommandList(
 			0,
@@ -170,15 +170,15 @@ namespace Hooks
 		if (FAILED(createCommandListResult))
 		{
 			char buffer[256];
-			sprintf_s(buffer, "hooks | CreateCommandList failed: 0x%08X\n", createCommandListResult);
-			ShaderInjectorIO::WriteToLogFile(buffer);
+			sprintf_s(buffer, "Hooks | CreateDeviceAndSwapChain | CreateCommandList failed: 0x%08X\n", createCommandListResult);
+			ShaderInjectorIO::WriteToLogFileError(buffer);
 			return createCommandListResult;
 		}
 
 		pCommandList->Close();
-		ShaderInjectorIO::WriteToLogFile("hooks | CreateCommandList Success!");
+		ShaderInjectorIO::WriteToLogFile("Hooks | CreateDeviceAndSwapChain | CreateCommandList Success!");
 		//============================== 8) SwapChainDesc1 ==============================
-		ShaderInjectorIO::WriteToLogFile("hooks | CreateSwapChainForHwnd...");
+		ShaderInjectorIO::WriteToLogFile("Hooks | CreateDeviceAndSwapChain | CreateSwapChainForHwnd...");
 
 		DXGI_SWAP_CHAIN_DESC1 swapChainDescription = {};
 		swapChainDescription.BufferCount = 2;
@@ -201,26 +201,26 @@ namespace Hooks
 		if (FAILED(createSwapChain1Result))
 		{
 			char buffer[256];
-			sprintf_s(buffer, "hooks | CreateSwapChainForHwnd failed: 0x%08X\n", createSwapChain1Result);
-			ShaderInjectorIO::WriteToLogFile(buffer);
+			sprintf_s(buffer, "Hooks | CreateDeviceAndSwapChain | CreateSwapChainForHwnd failed: 0x%08X\n", createSwapChain1Result);
+			ShaderInjectorIO::WriteToLogFileError(buffer);
 			return createSwapChain1Result;
 		}
 
-		ShaderInjectorIO::WriteToLogFile("hooks | CreateSwapChainForHwnd Success!");
+		ShaderInjectorIO::WriteToLogFile("Hooks | CreateDeviceAndSwapChain | CreateSwapChainForHwnd Success!");
 		//============================== 9) Query IDXGISwapChain3 ==============================
-		ShaderInjectorIO::WriteToLogFile("hooks | querying IDXGISwapChain3...");
+		ShaderInjectorIO::WriteToLogFile("Hooks | CreateDeviceAndSwapChain | querying IDXGISwapChain3...");
 
 		HRESULT swapChainQueryResult = swapChain1.As(&pSwapChain);
 
 		if (FAILED(swapChainQueryResult))
 		{
 			char buffer[256];
-			sprintf_s(buffer, "hooks | QueryInterface IDXGISwapChain3 failed: 0x%08X\n", swapChainQueryResult);
-			ShaderInjectorIO::WriteToLogFile(buffer);
+			sprintf_s(buffer, "Hooks | CreateDeviceAndSwapChain | QueryInterface IDXGISwapChain3 failed: 0x%08X\n", swapChainQueryResult);
+			ShaderInjectorIO::WriteToLogFileError(buffer);
 			return swapChainQueryResult;
 		}
 
-		ShaderInjectorIO::WriteToLogFile("hooks | QueryInterface IDXGISwapChain3 Success!");
+		ShaderInjectorIO::WriteToLogFile("Hooks | CreateDeviceAndSwapChain | QueryInterface IDXGISwapChain3 Success!");
 		return S_OK;
 	}
 
@@ -228,7 +228,7 @@ namespace Hooks
 	{
 		//IMPORTANT NOTE 1: We are able to get to this point and call this function
 		//NOTE: keep this comment around for sanity check please!
-		ShaderInjectorIO::WriteToLogFile("hooks | initalizing hooks...");
+		ShaderInjectorIO::WriteToLogFile("Hooks | Initalize | initalizing hooks...");
 
 		struct CleanupGuard 
 		{
@@ -242,7 +242,7 @@ namespace Hooks
 
 		if (FAILED(createDeviceAndSwapChainResult))
 		{
-			ShaderInjectorIO::WriteToLogFile("hooks | Failed to create dummy device/swapchain.");
+			ShaderInjectorIO::WriteToLogFileError("Hooks | Initalize | Failed to create dummy device/swapchain.");
 			return;
 		}
 
@@ -276,8 +276,8 @@ namespace Hooks
 		if (minHookStatus != MH_OK)
 		{
 			char buffer[256];
-			sprintf_s(buffer, "hooks | MH_CreateHook Present failed: %s\n", MH_StatusToString(minHookStatus));
-			ShaderInjectorIO::WriteToLogFile(buffer);
+			sprintf_s(buffer, "Hooks | Initalize | MH_CreateHook Present failed: %s\n", MH_StatusToString(minHookStatus));
+			ShaderInjectorIO::WriteToLogFileError(buffer);
 		}
 
 		//======================================== Hook_Present1D3D12 ========================================
@@ -287,8 +287,8 @@ namespace Hooks
 		if (minHookStatus != MH_OK)
 		{
 			char buffer[256];
-			sprintf_s(buffer, "hooks | MH_CreateHook Present1 failed: %s\n", MH_StatusToString(minHookStatus));
-			ShaderInjectorIO::WriteToLogFile(buffer);
+			sprintf_s(buffer, "Hooks | Initalize | MH_CreateHook Present1 failed: %s\n", MH_StatusToString(minHookStatus));
+			ShaderInjectorIO::WriteToLogFileError(buffer);
 		}
 
 		//======================================== Hook_ResizeBuffersD3D12 ========================================
@@ -298,8 +298,8 @@ namespace Hooks
 		if (minHookStatus != MH_OK)
 		{
 			char buffer[256];
-			sprintf_s(buffer, "hooks | MH_CreateHook ResizeBuffers failed: %s\n", MH_StatusToString(minHookStatus));
-			ShaderInjectorIO::WriteToLogFile(buffer);
+			sprintf_s(buffer, "Hooks | Initalize | MH_CreateHook ResizeBuffers failed: %s\n", MH_StatusToString(minHookStatus));
+			ShaderInjectorIO::WriteToLogFileError(buffer);
 		}
 
 		//======================================== Hook_ExecuteCommandListsD3D12 ========================================
@@ -309,8 +309,8 @@ namespace Hooks
 		if (minHookStatus != MH_OK)
 		{
 			char buffer[256];
-			sprintf_s(buffer, "hooks | MH_CreateHook ExecuteCommandLists failed: %s\n", MH_StatusToString(minHookStatus));
-			ShaderInjectorIO::WriteToLogFile(buffer);
+			sprintf_s(buffer, "Hooks | Initalize | MH_CreateHook ExecuteCommandLists failed: %s\n", MH_StatusToString(minHookStatus));
+			ShaderInjectorIO::WriteToLogFileError(buffer);
 		}
 
 		//======================================== Enable Hooks ========================================
@@ -320,15 +320,15 @@ namespace Hooks
 		if (minHookStatus != MH_OK)
 		{
 			char buffer[256];
-			sprintf_s(buffer, "hooks | MH_EnableHook failed: %s\n", MH_StatusToString(minHookStatus));
-			ShaderInjectorIO::WriteToLogFile(buffer);
+			sprintf_s(buffer, "Hooks | Initalize | MH_EnableHook failed: %s\n", MH_StatusToString(minHookStatus));
+			ShaderInjectorIO::WriteToLogFileError(buffer);
 		}
 		else
 		{
-			ShaderInjectorIO::WriteToLogFile("hooks | Hooks enabled.");
+			ShaderInjectorIO::WriteToLogFile("Hooks | Initalize | Hooks enabled.");
 			/*
 			char buffer[256];
-			sprintf_s(buffer, "hooks | Hooks enabled. Present@%p (idx=%zu), Present1@%p (idx=%zu), Resize@%p (idx=%zu), Exec@%p (idx=%zu)\n",
+			sprintf_s(buffer, "Hooks | Initalize | Hooks enabled. Present@%p (idx=%zu), Present1@%p (idx=%zu), Resize@%p (idx=%zu), Exec@%p (idx=%zu)\n",
 				reinterpret_cast<LPVOID>(scVTable[kPresentIndex]), kPresentIndex,
 				reinterpret_cast<LPVOID>(scVTable[kPresent1Index]), kPresent1Index,
 				reinterpret_cast<LPVOID>(scVTable[kResizeBuffersIndex]), kResizeBuffersIndex,

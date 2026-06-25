@@ -6,6 +6,7 @@
 #include <io.h>
 #include <vector>
 #include <fstream>
+#include <cstring>
 
 #include "ShaderTemplates.h"
 
@@ -84,6 +85,74 @@ namespace ShaderInjectorIO
 		CreateDirectoryA(path.c_str(), nullptr);
 	}
 
+	std::string DirectoryFromPath(const std::string& path)
+	{
+		const size_t slash = path.find_last_of("\\/");
+		return slash == std::string::npos ? "" : path.substr(0, slash);
+	}
+
+	std::string FileNameFromPath(const std::string& path)
+	{
+		const size_t slash = path.find_last_of("\\/");
+		return slash == std::string::npos ? path : path.substr(slash + 1);
+	}
+
+	bool IsAbsolutePath(const std::string& path)
+	{
+		if (path.size() >= 3 && path[1] == ':' && (path[2] == '\\' || path[2] == '/'))
+			return true;
+
+		return path.size() >= 2 && ((path[0] == '\\' && path[1] == '\\') || (path[0] == '/' && path[1] == '/'));
+	}
+
+	void CollectFilesByExtension(
+		const std::string& directory,
+		const std::string& extension,
+		std::vector<std::string>& outFiles,
+		bool recursive,
+		bool includeFullPath)
+	{
+		if (directory.empty() || extension.empty())
+			return;
+
+		WIN32_FIND_DATAA findData{};
+		const std::string filePattern = directory + "\\*" + extension;
+		HANDLE findHandle = FindFirstFileA(filePattern.c_str(), &findData);
+
+		if (findHandle != INVALID_HANDLE_VALUE)
+		{
+			do
+			{
+				if (!(findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+					outFiles.push_back(includeFullPath ? directory + "\\" + findData.cFileName : findData.cFileName);
+			} while (FindNextFileA(findHandle, &findData));
+
+			FindClose(findHandle);
+		}
+
+		if (!recursive)
+			return;
+
+		const std::string childPattern = directory + "\\*";
+		findHandle = FindFirstFileA(childPattern.c_str(), &findData);
+
+		if (findHandle == INVALID_HANDLE_VALUE)
+			return;
+
+		do
+		{
+			if (!(findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+				continue;
+
+			if (strcmp(findData.cFileName, ".") == 0 || strcmp(findData.cFileName, "..") == 0)
+				continue;
+
+			CollectFilesByExtension(directory + "\\" + findData.cFileName, extension, outFiles, true, includeFullPath);
+		} while (FindNextFileA(findHandle, &findData));
+
+		FindClose(findHandle);
+	}
+
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| DIRECTORIES |||||||||||||||||||||||||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| DIRECTORIES |||||||||||||||||||||||||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| DIRECTORIES |||||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -155,6 +224,7 @@ namespace ShaderInjectorIO
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| LOGS |||||||||||||||||||||||||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| LOGS |||||||||||||||||||||||||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| LOGS |||||||||||||||||||||||||||||||||||||||||||||||||||||
+	//TODO: a current and a previous log file
 
 	//clears log file contents
 	void PurgeLogFile()
@@ -194,6 +264,18 @@ namespace ShaderInjectorIO
 			text.c_str());
 
 		fclose(f);
+	}
+
+	//quick wrapper, just to knock down our log strings in the code because my eyes hurt
+	void WriteToLogFileError(const std::string& text)
+	{
+		WriteToLogFile("[ERROR] " + text);
+	}
+
+	//quick wrapper, just to knock down our log strings in the code because my eyes hurt
+	void WriteToLogFileSuccess(const std::string& text)
+	{
+		WriteToLogFile("[SUCCESS] " + text);
 	}
 
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| TOOLS |||||||||||||||||||||||||||||||||||||||||||||||||||||

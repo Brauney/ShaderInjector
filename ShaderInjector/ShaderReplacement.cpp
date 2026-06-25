@@ -9,29 +9,10 @@
 
 namespace ShaderReplacement
 {
-	std::string DirectoryFromPath(const std::string& path)
-	{
-		const size_t slash = path.find_last_of("\\/");
-		return slash == std::string::npos ? "" : path.substr(0, slash);
-	}
-
-	std::string FileNameFromPath(const std::string& path)
-	{
-		const size_t slash = path.find_last_of("\\/");
-		return slash == std::string::npos ? path : path.substr(slash + 1);
-	}
-
-	bool IsAbsolutePath(const std::string& path)
-	{
-		if (path.size() >= 3 && path[1] == ':' && (path[2] == '\\' || path[2] == '/'))
-			return true;
-		return path.size() >= 2 && ((path[0] == '\\' && path[1] == '\\') || (path[0] == '/' && path[1] == '/'));
-	}
-
 	void MakePathFieldPortable(std::string& path)
 	{
 		if (!path.empty())
-			path = FileNameFromPath(path);
+			path = ShaderInjectorIO::FileNameFromPath(path);
 	}
 
 	void ResolvePathField(std::string& path, const std::string& replacementDirectory)
@@ -39,7 +20,7 @@ namespace ShaderReplacement
 		if (path.empty() || replacementDirectory.empty())
 			return;
 
-		path = replacementDirectory + "\\" + FileNameFromPath(path);
+		path = replacementDirectory + "\\" + ShaderInjectorIO::FileNameFromPath(path);
 	}
 
 	std::string ShaderSourceSubdirectoryForType(ShaderReplacement::ShaderType shaderType)
@@ -86,7 +67,7 @@ namespace ShaderReplacement
 	void MakeReplacementPortableForDisk(ShaderReplacement::ShaderReplacementDisk& replacement)
 	{
 		if (replacement.shaderSourceName.empty() && !replacement.shaderSourcePath.empty())
-			replacement.shaderSourceName = FileNameFromPath(replacement.shaderSourcePath);
+			replacement.shaderSourceName = ShaderInjectorIO::FileNameFromPath(replacement.shaderSourcePath);
 
 		if (!replacement.shaderSourceName.empty())
 			replacement.shaderSourcePath = replacement.shaderSourceName;
@@ -99,7 +80,7 @@ namespace ShaderReplacement
 
 	void ResolveReplacementPathsFromJsonLocation(ShaderReplacement::ShaderReplacementDisk& replacement, const std::string& jsonPath)
 	{
-		const std::string replacementDirectory = DirectoryFromPath(jsonPath);
+		const std::string replacementDirectory = ShaderInjectorIO::DirectoryFromPath(jsonPath);
 		replacement.replacementDirectory = replacementDirectory;
 
 		for (std::string* path : PathFields(replacement))
@@ -107,10 +88,10 @@ namespace ShaderReplacement
 
 		const std::string legacySourcePath = replacement.shaderSourcePath.empty()
 			? ""
-			: replacementDirectory + "\\" + FileNameFromPath(replacement.shaderSourcePath);
+			: replacementDirectory + "\\" + ShaderInjectorIO::FileNameFromPath(replacement.shaderSourcePath);
 
 		if (replacement.shaderSourceName.empty() && !replacement.shaderSourcePath.empty())
-			replacement.shaderSourceName = FileNameFromPath(replacement.shaderSourcePath);
+			replacement.shaderSourceName = ShaderInjectorIO::FileNameFromPath(replacement.shaderSourcePath);
 
 		if (!replacement.shaderSourceName.empty())
 		{
@@ -246,52 +227,13 @@ namespace ShaderReplacement
 
 	void CollectShaderReplacementJsonFiles(const std::string& directory, std::vector<std::string>& outJsonFiles)
 	{
-		WIN32_FIND_DATAA findData{};
-		const std::string jsonPattern = directory + "\\*" + ShaderInjectorIO::extensionJSON;
-		HANDLE findHandle = FindFirstFileA(jsonPattern.c_str(), &findData);
+		std::vector<std::string> jsonFiles;
+		ShaderInjectorIO::CollectFilesByExtension(directory, ShaderInjectorIO::extensionJSON, jsonFiles, true);
 
-		if (findHandle != INVALID_HANDLE_VALUE)
+		for (const std::string& jsonFile : jsonFiles)
 		{
-			do
-			{
-				if (!(findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && IsShaderReplacementJsonFilename(findData.cFileName))
-					outJsonFiles.push_back(directory + "\\" + findData.cFileName);
-			} while (FindNextFileA(findHandle, &findData));
-
-			FindClose(findHandle);
+			if (IsShaderReplacementJsonFilename(ShaderInjectorIO::FileNameFromPath(jsonFile).c_str()))
+				outJsonFiles.push_back(jsonFile);
 		}
-
-		const std::string childPattern = directory + "\\*";
-		findHandle = FindFirstFileA(childPattern.c_str(), &findData);
-
-		if (findHandle == INVALID_HANDLE_VALUE)
-			return;
-
-		do
-		{
-			if (!(findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
-				continue;
-
-			if (strcmp(findData.cFileName, ".") == 0 || strcmp(findData.cFileName, "..") == 0)
-				continue;
-
-			const std::string childDirectory = directory + "\\" + findData.cFileName;
-			const std::string childJsonPattern = childDirectory + "\\*" + ShaderInjectorIO::extensionJSON;
-			WIN32_FIND_DATAA childFindData{};
-			HANDLE childFindHandle = FindFirstFileA(childJsonPattern.c_str(), &childFindData);
-
-			if (childFindHandle == INVALID_HANDLE_VALUE)
-				continue;
-
-			do
-			{
-				if (!(childFindData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && IsShaderReplacementJsonFilename(childFindData.cFileName))
-					outJsonFiles.push_back(childDirectory + "\\" + childFindData.cFileName);
-			} while (FindNextFileA(childFindHandle, &childFindData));
-
-			FindClose(childFindHandle);
-		} while (FindNextFileA(findHandle, &findData));
-
-		FindClose(findHandle);
 	}
 }

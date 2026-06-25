@@ -9,10 +9,79 @@
 
 namespace HookD3D12
 {
-	static bool gD3D12CreateDeviceHookInstalled = false;
-	static bool gCommandListHookInstalled = false;
-	static std::unordered_set<void*> gPipelineHookedDeviceVTables;
-	static std::unordered_set<void*> gCommandListHookedVTables;
+	static bool checkD3D12CreateDeviceHookInstalled = false;
+	static bool checkCommandListHookInstalled = false;
+	static std::unordered_set<void*> graphicsPipelineHookedDeviceVTables;
+	static std::unordered_set<void*> graphicsCommandListHookedVTables;
+
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| INSTALL D3D12 CREATE DEVICE HOOK |||||||||||||||||||||||||||||||||||||||||||||||||||||
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| INSTALL D3D12 CREATE DEVICE HOOK |||||||||||||||||||||||||||||||||||||||||||||||||||||
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| INSTALL D3D12 CREATE DEVICE HOOK |||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+	bool InstallD3D12CreateDeviceHook(HMODULE d3d12Module)
+	{
+		if (checkD3D12CreateDeviceHookInstalled)
+			return true;
+
+		if (!d3d12Module)
+			return false;
+
+		void* createDeviceAddress = reinterpret_cast<void*>(GetProcAddress(d3d12Module, "D3D12CreateDevice"));
+
+		if (!createDeviceAddress)
+		{
+			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12 | InstallD3D12CreateDeviceHook | D3D12CreateDevice export not found");
+			return false;
+		}
+
+		MH_STATUS createStatus = MH_CreateHook(createDeviceAddress, reinterpret_cast<void*>(&Hook_D3D12CreateDevice), reinterpret_cast<void**>(&Original_D3D12CreateDevice));
+
+		if (createStatus != MH_OK && createStatus != MH_ERROR_ALREADY_CREATED)
+		{
+			ShaderInjectorGUI::WriteToRuntimeLogError(std::string("HookD3D12 | InstallD3D12CreateDeviceHook | D3D12CreateDevice hook create failed: ") + MH_StatusToString(createStatus));
+			return false;
+		}
+
+		MH_STATUS enableStatus = MH_EnableHook(createDeviceAddress);
+
+		if (enableStatus != MH_OK && enableStatus != MH_ERROR_ENABLED)
+		{
+			ShaderInjectorGUI::WriteToRuntimeLogError(std::string("HookD3D12 | InstallD3D12CreateDeviceHook | D3D12CreateDevice hook enable failed: ") + MH_StatusToString(enableStatus));
+			return false;
+		}
+
+		checkD3D12CreateDeviceHookInstalled = true;
+		ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12 | InstallD3D12CreateDeviceHook | D3D12CreateDevice hook installed");
+		return true;
+	}
+
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| HOOK D3D12 CREATE DEVICE |||||||||||||||||||||||||||||||||||||||||||||||||||||
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| HOOK D3D12 CREATE DEVICE |||||||||||||||||||||||||||||||||||||||||||||||||||||
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| HOOK D3D12 CREATE DEVICE |||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+	HRESULT WINAPI Hook_D3D12CreateDevice(IUnknown* pAdapter, D3D_FEATURE_LEVEL MinimumFeatureLevel, REFIID riid, void** ppDevice)
+	{
+		HRESULT createDeviceResult = Original_D3D12CreateDevice(pAdapter, MinimumFeatureLevel, riid, ppDevice);
+
+		if (SUCCEEDED(createDeviceResult) && ppDevice && *ppDevice)
+		{
+			ID3D12Device* device = nullptr;
+			IUnknown* unknown = reinterpret_cast<IUnknown*>(*ppDevice);
+
+			if (SUCCEEDED(unknown->QueryInterface(IID_PPV_ARGS(&device))))
+			{
+				InstallPipelineHooksForDevice(device);
+				ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12 | InstallD3D12CreateDeviceHook | D3D12CreateDevice captured device and installed pipeline hooks");
+				device->Release();
+			}
+		}
+
+		return createDeviceResult;
+	}
+
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| INSTALL PIPELINE HOOKS |||||||||||||||||||||||||||||||||||||||||||||||||||||
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| INSTALL PIPELINE HOOKS |||||||||||||||||||||||||||||||||||||||||||||||||||||
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| INSTALL PIPELINE HOOKS |||||||||||||||||||||||||||||||||||||||||||||||||||||
 
 	void InstallPipelineHooksForDevice(ID3D12Device* device)
 	{
@@ -22,7 +91,7 @@ namespace HookD3D12
 		void** deviceVTable = *reinterpret_cast<void***>(device);
 		void* deviceVTableKey = deviceVTable;
 
-		if (!gPipelineHookedDeviceVTables.insert(deviceVTableKey).second)
+		if (!graphicsPipelineHookedDeviceVTables.insert(deviceVTableKey).second)
 			return;
 
 		MH_STATUS statusGraphicsPipelineCreate = MH_CreateHook(deviceVTable[VTableIndex::indexCreateGraphicsPipelineState], &Hook_CreateGraphicsPipelineState, reinterpret_cast<void**>(&Original_CreateGraphicsPipelineState));
@@ -44,7 +113,9 @@ namespace HookD3D12
 			MH_STATUS statusCreatePipelineStateEnable = MH_EnableHook(device2VTable[VTableIndex::indexCreatePipelineState]);
 
 			if (statusCreatePipelineStateCreate == MH_OK && statusCreatePipelineStateEnable == MH_OK)
-				ShaderInjectorGUI::WriteToRuntimeLog("CreatePipelineState hook installed");
+				ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12 | InstallPipelineHooksForDevice | CreatePipelineState hook installed");
+			else
+				ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12 | InstallPipelineHooksForDevice | CreatePipelineState hook failed");
 
 			device2->Release();
 		}
@@ -61,75 +132,30 @@ namespace HookD3D12
 			device1->Release();
 
 			if (statusCreatePipelineLibraryCreate == MH_OK && statusCreatePipelineLibraryEnable == MH_OK)
-				ShaderInjectorGUI::WriteToRuntimeLog("CreatePipelineLibrary hook installed");
+				ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12 | InstallPipelineHooksForDevice | CreatePipelineLibrary hook installed");
+			else
+				ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12 | InstallPipelineHooksForDevice | CreatePipelineLibrary hook failed");
 		}
 
 		if (statusGraphicsPipelineCreate == MH_OK && statusGraphicsPipelineEnable == MH_OK)
-			ShaderInjectorGUI::WriteToRuntimeLog("CreateGraphicsPipelineState hook installed");
+			ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12 | InstallPipelineHooksForDevice | CreateGraphicsPipelineState hook installed");
+		else
+			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12 | InstallPipelineHooksForDevice | CreateGraphicsPipelineState hook failed");
 
 		if (statusComputePipelineCreate == MH_OK && statusComputePipelineEnable == MH_OK)
-			ShaderInjectorGUI::WriteToRuntimeLog("CreateComputePipelineState hook installed");
+			ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12 | InstallPipelineHooksForDevice | CreateComputePipelineState hook installed");
+		else
+			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12 | InstallPipelineHooksForDevice | CreateComputePipelineState hook failed");
 
 		if (statusRootSignatureCreate == MH_OK && statusRootSignatureEnable == MH_OK)
-			ShaderInjectorGUI::WriteToRuntimeLog("CreateRootSignature hook installed");
+			ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12 | InstallPipelineHooksForDevice | CreateRootSignature hook installed");
+		else
+			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12 | InstallPipelineHooksForDevice | CreateRootSignature hook failed");
 	}
 
-	HRESULT WINAPI Hook_D3D12CreateDevice(IUnknown* pAdapter, D3D_FEATURE_LEVEL MinimumFeatureLevel, REFIID riid, void** ppDevice)
-	{
-		HRESULT hr = Original_D3D12CreateDevice(pAdapter, MinimumFeatureLevel, riid, ppDevice);
-
-		if (SUCCEEDED(hr) && ppDevice && *ppDevice)
-		{
-			ID3D12Device* device = nullptr;
-			IUnknown* unknown = reinterpret_cast<IUnknown*>(*ppDevice);
-
-			if (SUCCEEDED(unknown->QueryInterface(IID_PPV_ARGS(&device))))
-			{
-				InstallPipelineHooksForDevice(device);
-				ShaderInjectorGUI::WriteToRuntimeLog("D3D12CreateDevice captured device and installed pipeline hooks");
-				device->Release();
-			}
-		}
-
-		return hr;
-	}
-
-	bool InstallD3D12CreateDeviceHook(HMODULE d3d12Module)
-	{
-		if (gD3D12CreateDeviceHookInstalled)
-			return true;
-
-		if (!d3d12Module)
-			return false;
-
-		void* createDeviceAddress = reinterpret_cast<void*>(GetProcAddress(d3d12Module, "D3D12CreateDevice"));
-
-		if (!createDeviceAddress)
-		{
-			ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12 | InstallD3D12CreateDeviceHook | D3D12CreateDevice export not found");
-			return false;
-		}
-
-		MH_STATUS createStatus = MH_CreateHook(createDeviceAddress, reinterpret_cast<void*>(&Hook_D3D12CreateDevice), reinterpret_cast<void**>(&Original_D3D12CreateDevice));
-
-		if (createStatus != MH_OK && createStatus != MH_ERROR_ALREADY_CREATED)
-		{
-			ShaderInjectorGUI::WriteToRuntimeLog(std::string("HookD3D12 | InstallD3D12CreateDeviceHook | D3D12CreateDevice hook create failed: ") + MH_StatusToString(createStatus));
-			return false;
-		}
-
-		MH_STATUS enableStatus = MH_EnableHook(createDeviceAddress);
-
-		if (enableStatus != MH_OK && enableStatus != MH_ERROR_ENABLED)
-		{
-			ShaderInjectorGUI::WriteToRuntimeLog(std::string("HookD3D12 | InstallD3D12CreateDeviceHook | D3D12CreateDevice hook enable failed: ") + MH_StatusToString(enableStatus));
-			return false;
-		}
-
-		gD3D12CreateDeviceHookInstalled = true;
-		ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12 | InstallD3D12CreateDeviceHook | D3D12CreateDevice hook installed");
-		return true;
-	}
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| INSTALL COMMAND LIST HOOKS |||||||||||||||||||||||||||||||||||||||||||||||||||||
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| INSTALL COMMAND LIST HOOKS |||||||||||||||||||||||||||||||||||||||||||||||||||||
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| INSTALL COMMAND LIST HOOKS |||||||||||||||||||||||||||||||||||||||||||||||||||||
 
 	void InstallCommandListHooksForCommandList(ID3D12GraphicsCommandList* commandList)
 	{
@@ -139,7 +165,7 @@ namespace HookD3D12
 		void** commandListVTable = *reinterpret_cast<void***>(commandList);
 		void* commandListVTableKey = commandListVTable;
 
-		if (!gCommandListHookedVTables.insert(commandListVTableKey).second)
+		if (!graphicsCommandListHookedVTables.insert(commandListVTableKey).second)
 			return;
 
 		MH_STATUS resetCreate = MH_CreateHook(commandListVTable[VTableIndex::indexResetGraphicsCommandList], &Hook_ResetGraphicsCommandList, reinterpret_cast<void**>(&Original_ResetGraphicsCommandList));
@@ -156,16 +182,24 @@ namespace HookD3D12
 
 		if (resetCreate == MH_OK && resetEnable == MH_OK)
 			ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12 | InstallCommandListHooksForCommandList | CommandList Reset hook installed");
+		else
+			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12 | InstallCommandListHooksForCommandList | CommandList Reset hook failed");
 
 		if (setPipelineCreate == MH_OK && setPipelineEnable == MH_OK)
 			ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12 | InstallCommandListHooksForCommandList | SetPipelineState hook installed");
+		else
+			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12 | InstallCommandListHooksForCommandList | SetPipelineState hook failed");
 
 		if (setComputeRootCreate == MH_OK && setComputeRootEnable == MH_OK)
 			ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12 | InstallCommandListHooksForCommandList | SetComputeRootSignature hook installed");
+		else
+			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12 | InstallCommandListHooksForCommandList | SetComputeRootSignature hook failed");
 
 		if (setGraphicsRootCreate == MH_OK && setGraphicsRootEnable == MH_OK)
-			ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12 | HandlePresentD3D12 | SetGraphicsRootSignature hook installed");
+			ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12 | InstallCommandListHooksForCommandList | SetGraphicsRootSignature hook installed");
+		else
+			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12 | InstallCommandListHooksForCommandList | SetGraphicsRootSignature hook failed");
 
-		gCommandListHookInstalled = true;
+		checkCommandListHookInstalled = true;
 	}
 }

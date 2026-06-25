@@ -24,6 +24,10 @@ namespace ShaderInjectorIO
 	bool WriteTextFileIfMissing(const std::string& path, const std::string& text);
 	bool DirectoryExists(const std::string& path);
 	void DirectoryCreate(const std::string& path);
+	std::string DirectoryFromPath(const std::string& path);
+	std::string FileNameFromPath(const std::string& path);
+	bool IsAbsolutePath(const std::string& path);
+	void CollectFilesByExtension(const std::string& directory, const std::string& extension, std::vector<std::string>& outFiles, bool recursive = false, bool includeFullPath = true);
 
 	std::string GetGameDirectory();
 	std::string GetShaderInjectorDirectory();
@@ -40,6 +44,8 @@ namespace ShaderInjectorIO
 	//logs
 	void PurgeLogFile();
 	void WriteToLogFile(const std::string& text);
+	void WriteToLogFileError(const std::string& text);
+	void WriteToLogFileSuccess(const std::string& text);
 
 	//tools
 	bool RunProcess(const std::string& commandLine);

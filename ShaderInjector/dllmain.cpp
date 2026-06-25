@@ -21,25 +21,32 @@ static DWORD WINAPI OnAttachDLL(LPVOID)
 	//IMPORTANT NOTE 1: The game's D3D12 device already exists before our proxy loads.
 
 	LoadRealDsoundDll();
+
+	//NOTE TO SELF: not a fan of this, even though it helps...
+	//this is just to ensure we don't get crazy crashes or timing issues with d3d12 because im sick and tired of crashing
 	Sleep(5000);
 
 	//||||||||||||||||||||||||||||||| INITALIZE IO |||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||| INITALIZE IO |||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||| INITALIZE IO |||||||||||||||||||||||||||||||
 
+	//initalize IO operations (folders, files, internal shader files)
 	ShaderInjectorIO::Initialize();
+
+	//clear log file on start so we start fresh
+	//TODO: make a "previous" log file to store results of last session
 	ShaderInjectorIO::PurgeLogFile();
 
 	//IMPORTANT NOTE 2: We are able to create and run this thread, so this does execute and work!
 	//NOTE 1: keep this comment around for sanity check please!
 	//NOTE 2: because this is on a seperate thread, popping a message box will not freeze the application!
-	ShaderInjectorIO::WriteToLogFile("dllmain | dsound thread initalized!");
+	ShaderInjectorIO::WriteToLogFile("dllmain | OnAttachDLL | dsound thread initalized!");
 
 	//||||||||||||||||||||||||||||||| SHADER |||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||| SHADER |||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||| SHADER |||||||||||||||||||||||||||||||
 
-	ShaderInjectorIO::WriteToLogFile("dllmain | getting null shader...");
+	ShaderInjectorIO::WriteToLogFile("dllmain | OnAttachDLL | getting null shader...");
 
 	std::string nullShaderPath = ShaderInjectorIO::GetInternalNullPixelShaderSourceCodeFilePath();
 	std::string nullShaderBlobPath = ShaderInjectorIO::GetInternalNullPixelShaderBlobFilePath();
@@ -52,46 +59,42 @@ static DWORD WINAPI OnAttachDLL(LPVOID)
 
 	if (nullShaderCompiled)
 	{
-		bool nullShaderLoaded = ShaderInjectorIO::LoadDXILBlobFromDisk(
-			nullShaderBlobPath, //NOTE: this NEEDS to be a DXIL compiled binary file
-			Globals::nullPixelShaderBlob); //array to contain the data in memory
+		//NOTE: 'nullShaderBlobPath' this NEEDS to be a DXIL compiled binary file
+		//'Globals::nullPixelShaderBlob' array to contain the data in memory
+		bool nullShaderLoaded = ShaderInjectorIO::LoadDXILBlobFromDisk(nullShaderBlobPath, Globals::nullPixelShaderBlob);
 
 		if (!nullShaderLoaded || Globals::nullPixelShaderBlob.empty())
 		{
 			Globals::nullPixelShaderBlob.clear();
-			ShaderInjectorIO::WriteToLogFile("dllmain | failed to load null pixel shader blob: " + nullShaderBlobPath);
+			ShaderInjectorIO::WriteToLogFileError("dllmain | OnAttachDLL | failed to load null pixel shader blob: " + nullShaderBlobPath);
 		}
 	}
 	else
 	{
 		Globals::nullPixelShaderBlob.clear();
-		ShaderInjectorIO::WriteToLogFile("dllmain | failed to compile null pixel shader: " + nullShaderPath);
+		ShaderInjectorIO::WriteToLogFileError("dllmain | OnAttachDLL | failed to compile null pixel shader: " + nullShaderPath);
 	}
 
-	ShaderInjectorIO::WriteToLogFile("dllmain | globals::nullPixelShaderBlob size " + std::to_string(Globals::nullPixelShaderBlob.size()));
+	ShaderInjectorIO::WriteToLogFile("dllmain | OnAttachDLL | globals::nullPixelShaderBlob size " + std::to_string(Globals::nullPixelShaderBlob.size()));
 
-	bool markerPixelLoaded = ShaderInjectorIO::LoadDXILBlobFromDisk(
-		ShaderInjectorIO::GetInternalMarkerPixelShaderBlobFilePath(),
-		Globals::markerPixelShaderBlob);
+	bool markerPixelLoaded = ShaderInjectorIO::LoadDXILBlobFromDisk(ShaderInjectorIO::GetInternalMarkerPixelShaderBlobFilePath(), Globals::markerPixelShaderBlob);
 
 	if (!markerPixelLoaded || Globals::markerPixelShaderBlob.empty())
 	{
 		Globals::markerPixelShaderBlob.clear();
-		ShaderInjectorIO::WriteToLogFile("dllmain | failed to load marker pixel shader blob: " + ShaderInjectorIO::GetInternalMarkerPixelShaderBlobFilePath());
+		ShaderInjectorIO::WriteToLogFileError("dllmain | OnAttachDLL | failed to load marker pixel shader blob: " + ShaderInjectorIO::GetInternalMarkerPixelShaderBlobFilePath());
 	}
 
-	bool markerComputeLoaded = ShaderInjectorIO::LoadDXILBlobFromDisk(
-		ShaderInjectorIO::GetInternalMarkerComputeShaderBlobFilePath(),
-		Globals::markerComputeShaderBlob);
+	bool markerComputeLoaded = ShaderInjectorIO::LoadDXILBlobFromDisk(ShaderInjectorIO::GetInternalMarkerComputeShaderBlobFilePath(), Globals::markerComputeShaderBlob);
 
 	if (!markerComputeLoaded || Globals::markerComputeShaderBlob.empty())
 	{
 		Globals::markerComputeShaderBlob.clear();
-		ShaderInjectorIO::WriteToLogFile("dllmain | failed to load marker compute shader blob: " + ShaderInjectorIO::GetInternalMarkerComputeShaderBlobFilePath());
+		ShaderInjectorIO::WriteToLogFileError("dllmain | OnAttachDLL | failed to load marker compute shader blob: " + ShaderInjectorIO::GetInternalMarkerComputeShaderBlobFilePath());
 	}
 
-	ShaderInjectorIO::WriteToLogFile("dllmain | globals::markerPixelShaderBlob size " + std::to_string(Globals::markerPixelShaderBlob.size()));
-	ShaderInjectorIO::WriteToLogFile("dllmain | globals::markerComputeShaderBlob size " + std::to_string(Globals::markerComputeShaderBlob.size()));
+	ShaderInjectorIO::WriteToLogFile("dllmain | OnAttachDLL | globals::markerPixelShaderBlob size " + std::to_string(Globals::markerPixelShaderBlob.size()));
+	ShaderInjectorIO::WriteToLogFile("dllmain | OnAttachDLL | globals::markerComputeShaderBlob size " + std::to_string(Globals::markerComputeShaderBlob.size()));
 
 	//||||||||||||||||||||||||||||||| INITALIZE MINHOOK |||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||| INITALIZE MINHOOK |||||||||||||||||||||||||||||||
@@ -102,14 +105,14 @@ static DWORD WINAPI OnAttachDLL(LPVOID)
 	if (status != MH_OK)
 	{
 		char buffer[256];
-		sprintf_s(buffer, "dllmain | MH_Initialize failed: %s", MH_StatusToString(status));
-		ShaderInjectorIO::WriteToLogFile(buffer);
+		sprintf_s(buffer, "dllmain | OnAttachDLL | MH_Initialize failed: %s", MH_StatusToString(status));
+		ShaderInjectorIO::WriteToLogFileError(buffer);
 		return 0;
 	}
 
 	//IMPORTANT NOTE 3: We are able to create and initalize minhook, so this does work!
 	//NOTE: keep this comment around for sanity check please!
-	ShaderInjectorIO::WriteToLogFile("dllmain | minhook initalized!");
+	ShaderInjectorIO::WriteToLogFile("dllmain | OnAttachDLL | minhook initalized!");
 
 	//||||||||||||||||||||||||||||||| D3D12 CHECK |||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||| D3D12 CHECK |||||||||||||||||||||||||||||||
@@ -120,20 +123,22 @@ static DWORD WINAPI OnAttachDLL(LPVOID)
 
 	if (!d3d12)
 	{
-		MessageBoxA(nullptr, "dllmain | d3d12.dll handle not found!", "Shader Injector", MB_OK);
+		ShaderInjectorIO::WriteToLogFileError("dllmain | OnAttachDLL | d3d12.dll handle not found!");
 		return 0;
 	}
 
 	//IMPORTANT NOTE 4: We can infact find the d3d12.dll and get a handle on it!
 	//NOTE: keep this comment around for sanity check please!
 	char buffer[256];
-	sprintf_s(buffer, "dllmain | d3d12.dll = %p", d3d12);
+	sprintf_s(buffer, "dllmain | OnAttachDLL | d3d12.dll = %p", d3d12);
 	ShaderInjectorIO::WriteToLogFile(buffer);
 
+	//this is where the real madness begins...
+	//hook into d3d12 device creation and start hooking into many of it's calls
 	HookD3D12::InstallD3D12CreateDeviceHook(d3d12);
 
 	//ref - https://github.com/Sh0ckFR/Universal-Dear-ImGui-Hook/blob/master/dllmain.cpp
-	ShaderInjectorIO::WriteToLogFile("dllmain | Attempting DX12 initialization...");
+	ShaderInjectorIO::WriteToLogFile("dllmain | OnAttachDLL | Attempting DX12 initialization...");
 	Hooks::Initalize();
 
 	return 0;
@@ -176,19 +181,19 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID)
 
 					//NOTE 1: keep this comment around just in case we hit headaches later, sanity check to verify if we are even creating a hook thread
 					//NOTE 2: popping a message box here will freeze the application!
-					//MessageBoxA(nullptr, "dllmain | Created hook thread!", "Shader Injector", MB_OK);
+					//MessageBoxA(nullptr, "dllmain | DllMain | Created hook thread!", "Shader Injector", MB_OK);
 				}
 				else
 				{
 					//NOTE 1: keep this comment around just in case we hit headaches later, sanity check to verify when we aren't able to create a hook thread
 					//NOTE 2: popping a message box here will freeze the application!
-					MessageBoxA(nullptr, "dllmain | Failed to create hook thread!", "Shader Injector", MB_OK);
+					MessageBoxA(nullptr, "[ERROR] dllmain | DllMain | Failed to create hook thread!", "Shader Injector", MB_OK);
 				}
 	
 
 				//NOTE 1: keep this comment around just in case we hit headaches later, sanity check to verify if the dll is even getting attached
 				//NOTE 2: popping a message box here will freeze the application!
-				//MessageBoxA(nullptr, "dllmain | dsound attached!", "Shader Injector", MB_OK);
+				//MessageBoxA(nullptr, "dllmain | DllMain | dsound attached!", "Shader Injector", MB_OK);
 			}
 
 			break;

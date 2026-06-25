@@ -25,7 +25,7 @@ namespace ShaderInjectorGUI
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| MAIN |||||||||||||||||||||||||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| MAIN |||||||||||||||||||||||||||||||||||||||||||||||||||||
 
-	void UI_MainWindow(const MainWindowContext& context)
+	void DrawMainWindow(const MainWindowContext& context)
 	{
 		if (!context.showWindow || !*context.showWindow)
 			return;
@@ -714,9 +714,7 @@ namespace ShaderInjectorGUI
 
 		const ImVec2 available = ImGui::GetContentRegionAvail();
 		const float logHeight = available.y > 140.0f ? available.y : 140.0f;
-		const ImGuiInputTextFlags flags =
-			ImGuiInputTextFlags_ReadOnly |
-			ImGuiInputTextFlags_NoHorizontalScroll;
+		const ImGuiInputTextFlags flags = ImGuiInputTextFlags_ReadOnly | ImGuiInputTextFlags_NoHorizontalScroll;
 
 		ImGui::InputTextMultiline(
 			"##RuntimeLogText",
@@ -731,6 +729,16 @@ namespace ShaderInjectorGUI
 		runtimeLogText += "\n";
 		runtimeLogText += text;
 		ShaderInjectorIO::WriteToLogFile(text);
+	}
+
+	void WriteToRuntimeLogError(std::string text)
+	{
+		WriteToRuntimeLog("[ERROR] " + text);
+	}
+
+	void WriteToRuntimeLogSuccess(std::string text)
+	{
+		WriteToRuntimeLog("[SUCCESS] " + text);
 	}
 
 	void ClearRuntimeLog()

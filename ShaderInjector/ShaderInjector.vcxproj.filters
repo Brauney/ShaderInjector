@@ -131,6 +131,9 @@
     <ClCompile Include="HookD3D12PipelineLibrary.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="HookD3D12ReplacementCreation.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="HookD3D12PipelineUtils.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
