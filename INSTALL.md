@@ -39,9 +39,10 @@ Shader Cache for Final Fantasy 7 Rebirth is stored in this path...
 
 You will see a ```D3DDriverByteCodeBlob``` file, **simply delete it!**
 
-![](GithubContent/step1-d1.png)
-
-![](GithubContent/step1-e1.png)
+<p float="left">
+    <img src="GithubContent/step1-d1.png" width="49%" />
+    <img src="GithubContent/step1-e1.png" width="49%" />
+</p>
 
 **Once it is deleted, now we're good to go for installation!**
 
@@ -68,14 +69,17 @@ Find your ```SteamLibrary``` or ```steamapps``` folder and you'll want to find t
 
 ![step2-d1](GithubContent/step2-d1.png)
 
-**You should be landing here and see this exact layout.** Then we can open our zip file and copy or drag ```dsound.dll``` and ```ShaderInjector``` into the directory as shown.
+**You should be landing here and see this exact layout.** This is where we will install our mod. Now from here open another window and navigate to where your mod was downloaded.
 
 <p float="left">
     <img src="GithubContent/step2-e1.png" width="49%" />
     <img src="GithubContent/step2-f1.png" width="49%" />
 </p>
 
+Open our zip file and copy or drag ```dsound.dll``` and ```ShaderInjector``` into the directory as shown.
+
 ![step2-d1](GithubContent/step2-g1.png)
+
 
 Once both the ```dsound.dll``` and ```ShaderInjector``` folder is in the directory and it looks like this, we can now boot into the game!
 
