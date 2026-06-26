@@ -112,11 +112,13 @@ We need to stay in the menu screen for this *(trust me, it's easier and far less
     <img src="GithubContent/step4-c1.jpg" width="32%" />
 </p>
 
+*Developer Settings -> Stream Pipelines -> Pixel Shaders*
+
 ![step4-d1](GithubContent/step4-d1.jpg)
 
-You should see a list of roughly ```~50``` pixel shaders collected. **We need to go through each one.** Now unfortunately this can take a second but there are tools here to help speedup the process but first...
+Click to open the list, and you should see a list of roughly ```~50``` pixel shaders collected. **We need to go through each one. Now unfortunately this can take a second but there are tools here to help speedup the process** but first...
 
-***IMPORTANT NOTE:*** **The hashes that you see in the list will not be the same as the one you see in the screenshot unfortunately. (there is a way around this shortly...)** But this is because the compiled bytecode is slightly different depending on GPU/Drivers.
+***IMPORTANT NOTE:*** **The hashes that you see in the list will not be the same as the one you see in the screenshot unfortunately** ***(there is a way around this shortly...)*** But this is because the compiled bytecode is slightly different depending on GPU/Drivers.
 
 **Fortunately though to help with this we can sort the list by ```Bytecode Length```**. Now again bytecode length will not be the exact same, but the **shaders all roughly compile to a similar bytecode length size** so to speedup the process of searching you can look for a shader with a bytecode length similar to the screenshot which is ***roughly ```37196 Bytes```.***
 
@@ -124,7 +126,7 @@ You should see a list of roughly ```~50``` pixel shaders collected. **We need to
 
 *NOTE: Remember that the hashes you see will in the screenshots will not be the same, but byte lengths should be in the ballpark.  Hashes will remain the same on multiple playthroughs on your machine (even through shader cache deletion/rebuilds), unless if there is a GPU/Driver update or change. But for the most part shader replacements will be persistent.*
 
-#### Selecting the right one... (PAY ATTENTION!)
+#### Selecting the right one... PAY ATTENTION!
 
 **This is where we really need to pay attention, and compare your results with the screenshots provided here.** As you dig through the shaders using the ```Blue Pixel Shader``` style of selection *(which is default)* ***you'll eventually hit a shader that looks exactly like this...***
 
@@ -134,7 +136,8 @@ You should see a list of roughly ```~50``` pixel shaders collected. **We need to
 
 ### Creating Shader Replacement For Local Light
 
-Now we have the hard part complete for this shader, all we have to do is setup a shader replacement template for it! On the bottom of the same window you will see a ```Create Replacement Shader Template``` button for the current selected shader. Click it!
+Now we have the hard part complete for finding this shader, **all we have to do is setup a shader replacement template for it!** On the bottom of the same window you will see a ```Create Replacement Shader Template``` button for the current selected shader. Click it!
+
 
 ![step4-f1](GithubContent/step4-f1.jpg)
 
@@ -149,9 +152,13 @@ Now we have the hard part complete for this shader, all we have to do is setup a
     <img src="GithubContent/step4-l1.png" width="24%" />
 </p>
 
+*Shader Replacement -> [Select Created Shader Replacement] -> Source Shader -> LocalLightShader.hlsl -> Rebuild Shader Replacement*
+
 **To solidify our changes and apply the shader replacement we finally click ```Rebuild Shader Replacement```.**
 
 ![step4-m1](GithubContent/step4-m1.png)
+
+**```Rebuild Shader Replacement```**
 
 ![sstep4-n1.jpg](GithubContent/step4-n1.jpg)
 
@@ -187,7 +194,7 @@ Once you are here just spin around and look behind you *(opposite of the wall, o
 
 Now go ahead and toggle the Shader Injector menu again. By default the keybinds are the ```[Insert]``` button to open/close the menu. *```[Home]``` to enable/disable the shader injector shaders. They should still be enabled during this process.*
 
-#### PAY ATTENTION!
+#### Selecting the right one... PAY ATTENTION!
 
 **This is where we really need to pay attention, and compare your results with the screenshots provided here.** As you dig through the shaders using either the ```Blue Pixel Shader``` or ```Hidden``` style of selection ***you'll eventually hit a shader that looks exactly like this...***
 
@@ -198,8 +205,48 @@ Now go ahead and toggle the Shader Injector menu again. By default the keybinds 
 
 ***LEFT SIDE: Blue Pixel Shader Selection (same shader) | RIGHT SIDE: Hidden Shader Selection (same shader)***
 
+If you want to verify you can change the selection type to see if your results match *(they should)* but if you are getting this, this means you found the correct shader! 
 
+### Creating Shader Replacement For Directional Light
+
+Just like before now we have the hard part complete for finding this shader, **all we have to do is setup a shader replacement template for it!** On the bottom of the same window you will see a ```Create Replacement Shader Template``` button for the current selected shader. Click it!
+
+![step5-g1](GithubContent/step5-g1.jpg)
+
+![step5-h1](GithubContent/step5-h1.jpg)
+
+**You should see your screen also turn into this**, the shader becomes red as now a template has been created for it but there is no shader assigned. **To assign a shader** we go into the ```Shader Replacements``` menu, select the newly created shader replacement and assign ```DirectionalLightShader.hlsl```.
+
+<p float="left">
+    <img src="GithubContent/step5-i1.jpg" width="24%" />
+    <img src="GithubContent/step5-j1.jpg" width="24%" />
+    <img src="GithubContent/step5-k1.jpg" width="24%" />
+    <img src="GithubContent/step5-l1.jpg" width="24%" />
+</p>
+
+*Shader Replacement -> [Select Created Shader Replacement] -> Source Shader -> LocalLightShader.hlsl -> Rebuild Shader Replacement*
+
+**To solidify our changes and apply the shader replacement we finally click ```Rebuild Shader Replacement```.**
+
+![step5-m1](GithubContent/step5-m1.jpg)
+
+**```Rebuild Shader Replacement```**
+
+![step5-n1.jpg](GithubContent/step5-n1.jpg)
+
+You should immediately see a change to this, with no more red, and extra shadows now within the scene. Now your directional light shader is modified and setup for this mod, and you are done!
+
+<p float="left">
+    <img src="GithubContent/step5-p1.jpg" width="49%" />
+    <img src="GithubContent/step5-p1.jpg" width="49%" />
+</p>
+
+***LEFT SIDE: Replacement Disabled | RIGHT SIDE: Replacement Enabled*** *Difference is rather small in this scene because the sunlight is very dark and muted*.
 
 # Step 6: Done!
 
-We are done! You can now continue playing the game either from here, or from a previous save you had. You can also close the game, and on reboot you should still see the new changes no matter where you are! *(Shader Injector digs through the cached PSOs and finds your shader replacement to apply changes)*
+We are done! You can now continue playing the game either from here, or from a previous save you had. 
+
+You can also close the game, and on reboot you should still see the new changes no matter where you are! *(Shader Injector digs through the cached PSOs and finds your shader replacement to apply changes)*. 
+
+Replacement Shaders should persist continously now, unless if you change/update your GPU/Drivers. Beyond that you shouldn't need to setup anything else!
