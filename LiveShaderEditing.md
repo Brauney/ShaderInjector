@@ -19,6 +19,7 @@ Now there is multiple sets of folders and potential different shader types for t
 You can open the raw .hlsl source code shaders in a text editor *(or code editor)* of your choice and edit them to your liking. The modified pixel shaders provided by the mod are written with pre-processor macros that are wired up, where you can easily toggle or adjust certain shader features.
 
 ![shader-code-example](GithubContent/LiveShaderEditing/shader-code-example.png)
+
 *LocalLightShader.hlsl written with macros at the very top of the file*
 
 If you are an experienced programmer you can skip this explanation, but for those who arent heres a very quick and brief rundown to configure things within a shader source code...
