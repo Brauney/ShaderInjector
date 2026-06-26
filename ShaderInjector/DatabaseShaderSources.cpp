@@ -1,9 +1,10 @@
-#include "PreCompiledHeader.h"
+//DatabaseShaderSources.cpp
+#include <algorithm>
 
+//custom
 #include "DatabaseShaderSources.h"
 #include "ShaderInjectorIO.h"
-
-#include <algorithm>
+#include "StringHelper.h"
 
 namespace DatabaseShaderSources
 {
@@ -15,7 +16,7 @@ namespace DatabaseShaderSources
 
 	std::string ShaderSourceSubdirectoryForType(ShaderReplacement::ShaderType shaderType)
 	{
-		return ShaderReplacement::ShaderTypeToString(shaderType) + "s";
+		return StringHelper::ShaderTypeToString(shaderType) + "s";
 	}
 
 	std::string ResolveShaderSourcePath(ShaderReplacement::ShaderType shaderType, const std::string& shaderSourceName)
@@ -37,6 +38,7 @@ namespace DatabaseShaderSources
 
 	void RefreshShaderSources(ShaderReplacement::ShaderType shaderType)
 	{
+		// Cache only filenames for the UI. Full paths are reconstructed from ShaderSources/<ShaderType>s.
 		gShaderSourceFiles.clear();
 		gShaderSourceListType = shaderType;
 

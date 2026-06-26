@@ -1,12 +1,15 @@
+//HookD3D12ReplacementTemplates.cpp
 #include "HookD3D12ReplacementTemplates.h"
 
 #include <algorithm>
 
+//custom
 #include "Hash.h"
 #include "HookD3D12PipelineUtils.h"
 #include "HookD3D12ReplacementLookup.h"
 #include "ShaderInjectorGUI.h"
 #include "ShaderInjectorIO.h"
+#include "StringHelper.h"
 
 namespace HookD3D12
 {
@@ -199,7 +202,7 @@ namespace HookD3D12
 		pipelineTemplate.name = prefix;
 		pipelineTemplate.sourceList = "Stream";
 		pipelineTemplate.pipelineIndex = std::to_string(pipelineIndex);
-		pipelineTemplate.psoPointer = PointerToString(pipeline.pipelineState);
+		pipelineTemplate.psoPointer = StringHelper::PointerToString(pipeline.pipelineState);
 		pipelineTemplate.pipelineStreamBlobPath = replacement.replacementDirectory + "\\" + prefix + "_PipelineStateStream" + ShaderInjectorIO::extensionBIN;
 		pipelineTemplate.pipelineStreamMetadataPath = replacement.replacementDirectory + "\\" + prefix + "_PipelineStateStreamMetadata" + ShaderInjectorIO::extensionJSON;
 		FillPipelineTemplateCommonState(pipelineTemplate, pipeline);

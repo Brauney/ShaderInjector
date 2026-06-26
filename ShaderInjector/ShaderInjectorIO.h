@@ -1,5 +1,4 @@
-// shaderinjector_io.h
-
+//ShaderInjectorIO.h
 #pragma once
 
 #include <string>
@@ -16,7 +15,9 @@ namespace ShaderInjectorIO
 	static const std::string extensionLOG  = ".log"; //shader injector log file
 	static const std::string extensionEXE  = ".exe"; //windows executable
 	static const char* imguiSettingsName = "ShaderInjectorGUI.ini";
+	static const char* injectorSettingsName = "ShaderInjector.ini";
 
+	//generic IO
 	bool PathExists(const std::string& path);
 	bool FileExists(const std::string& path);
 	void DeleteFileIfExists(const std::string& path);
@@ -29,6 +30,7 @@ namespace ShaderInjectorIO
 	bool IsAbsolutePath(const std::string& path);
 	void CollectFilesByExtension(const std::string& directory, const std::string& extension, std::vector<std::string>& outFiles, bool recursive = false, bool includeFullPath = true);
 
+	//directories/paths
 	std::string GetGameDirectory();
 	std::string GetShaderInjectorDirectory();
 	std::string GetDumpsDirectory();
@@ -40,6 +42,7 @@ namespace ShaderInjectorIO
 	std::string GetShaderReplacementsDirectory();
 	std::string GetShaderSourcesDirectory();
 	std::string GetShaderSourcesDirectory(const std::string& shaderTypeDirectoryName);
+	std::string GetInjectorSettingsPath();
 
 	//logs
 	void PurgeLogFile();
@@ -71,6 +74,10 @@ namespace ShaderInjectorIO
 	bool WriteInternalMarkerPixelShaderSourceCodeToDisk();
 	bool WriteInternalNullPixelShaderSourceCodeToDisk();
 	bool WriteInternalMarkerComputeShaderSourceCodeToDisk();
+
+	//injector settings
+	bool ReadInjectorSettings();
+	void CreateInjectorSettings();
 
 	//initalize
 	bool Initialize();

@@ -6,8 +6,10 @@
 #include <cstdlib>
 #include <vector>
 
+//3RD Party
 #include "imgui.h"
 
+//custom
 #include "HookD3D12.h"
 #include "ShaderInjectorIO.h"
 #include "Hash.h"
@@ -30,6 +32,7 @@ namespace ShaderInjectorGUI
 		DrawMenuFn drawMenu = nullptr;
 	};
 
+	void UI_ApplyStyle();
 	void DrawMainWindow(const MainWindowContext& context);
 	void UI_ShaderInjectorMenu();
 
@@ -71,6 +74,7 @@ namespace ShaderInjectorGUI
 		D3D12_PIPELINE_STATE_SUBOBJECT_TYPE subobjectType,
 		HookD3D12::PSOPendingRebuild::SourceList pendingSource,
 		bool allowMarkerToggle,
+		bool disableActions,
 		bool PipelineT::* disabledMember,
 		ID3D12PipelineState* PipelineT::* rebuiltPSOMember);
 
@@ -83,7 +87,6 @@ namespace ShaderInjectorGUI
 	//===================== runtime logs =====================
 	extern std::string runtimeLogText;
 
-	void UI_RuntimeLogTextBox(const std::string* logText);
 	void WriteToRuntimeLog(std::string text);
 	void WriteToRuntimeLogError(std::string text);
 	void WriteToRuntimeLogSuccess(std::string text);

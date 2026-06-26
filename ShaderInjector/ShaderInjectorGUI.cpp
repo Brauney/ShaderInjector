@@ -1,3 +1,4 @@
+//ShaderInjectorGUI.cpp
 #include "ShaderInjectorGUI.h"
 
 #include <algorithm>
@@ -6,17 +7,22 @@
 #include <string>
 #include <vector>
 
+//3RD Party
 #include "imgui.h"
 
+//custom
 #include "HookD3D12.h"
 #include "ShaderInjectorIO.h"
 #include "Hash.h"
 #include "Globals.h"
 #include "DatabaseShaderSources.h"
+#include "StringHelper.h"
+#include "ShaderInjectorGUITooltips.h"
+#include "Keycodes.h"
 
 namespace ShaderInjectorGUI
 {
-	static const float indentSpace = 24.0f;
+	static const float indentSpace = 16.0f;
 	std::string runtimeLogText;
 	static bool injectorDeveloperSettings = false;
 	static int gSelectionStyleIndex = (int)HookD3D12::ShaderSelectionStyle::BluePixelShader;
@@ -33,21 +39,19 @@ namespace ShaderInjectorGUI
 		ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse;
 		ImGui::SetNextWindowSize(ImVec2(600, 600), ImGuiCond_FirstUseEver);
 		ImGui::SetNextWindowPos(ImVec2(25, 25), ImGuiCond_FirstUseEver);
+		UI_ApplyStyle();
 
 		if (ImGui::Begin("Shader Injector", context.showWindow, flags))
 		{
+			ImGui::Checkbox("##InjectorEnabled", &Globals::gShaderInjectorEnabled);
+			ImGui::SameLine();
 			ImGui::Text("Injector %s", context.injectorEnabled ? "Enabled!" : "Disabled!");
 
 			if (context.fpsCounterActive)
-			{
-				ImGui::Checkbox("FPS: ", context.fpsCounterActive);
+				ImGui::Text("FPS: %.1f (%.4fms)", context.fps, context.frameTimeMs);
 
-				if (*context.fpsCounterActive)
-				{
-					ImGui::SameLine();
-					ImGui::Text("%.1f (%.4fms)", context.fps, context.frameTimeMs);
-				}
-			}
+			ImGui::Text("Toggle Injector: Press %s", Keycodes::KeycodeToString(Globals::keyToggleShaderInjector) + " (" + std::to_string(Globals::keyToggleShaderInjector) + ")");
+			ImGui::Text("Toggle Menu: Press %s", Keycodes::KeycodeToString(Globals::keyOpenShaderInjectorGUI) + " (" + std::to_string(Globals::keyOpenShaderInjectorGUI) + ")");
 
 			ImGui::Spacing();
 
@@ -61,8 +65,6 @@ namespace ShaderInjectorGUI
 			{
 				if (ImGui::Button("Clear Log"))
 					ClearRuntimeLog();
-
-				//DrawRuntimeLogTextBox(context.runtimeLogText);
 
 				if (context.runtimeLogText)
 					ImGui::TextUnformatted(context.runtimeLogText->c_str());
@@ -88,10 +90,31 @@ namespace ShaderInjectorGUI
 			ImGui::Indent(indentSpace);
 			ImGui::Spacing();
 
+			/*
+			ImGui::Text("NOTE: Shaders/PSOs can only be caught when the shader cache of the game has been freshly deleted. ");
+			ImGui::Text("During shader compilation this is where we can catch new shaders being built, which we can then ");
+			ImGui::Text("create 'replacement' templates for modification later inside the 'Shader Replacements' menu above.");
+			ImGui::Text("You only need to do this once if you are trying to setup a template for a shader you want to modify. ");
+			ImGui::Text("(replacement shaders remain persistent on multiple playthroughs)");
+			ImGui::Text("Read Mod documentation for more details/help...");
+			*/
+
+			ImGui::InputTextMultiline("##DeveloperSettingsNote",
+				const_cast<char*>(noteDeveloperSettingsText),
+				strlen(noteDeveloperSettingsText) + 1,
+				ImVec2(-FLT_MIN, 0),        // -FLT_MIN width = stretch to window edge, 0 height = auto
+				ImGuiInputTextFlags_ReadOnly | ImGuiInputTextFlags_WordWrap
+			);
+
+			ImGui::Spacing();
 			UI_AdapterInfo();
 			UI_D3D12PipelineInfo();
 
 			ImGui::Spacing();
+
+			ImGui::Text("Selection Style: ");
+			if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip(tooltipSelectonStyle);
+			ImGui::SameLine();
 
 			const char* selectionStyles[] =
 			{
@@ -100,14 +123,24 @@ namespace ShaderInjectorGUI
 				"None",
 			};
 
-			ImGui::Text("Selection Style");
-			ImGui::SameLine();
+			const char* btnLabel = "Clear Selections";
+			float buttonWidth = ImGui::CalcTextSize(btnLabel).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+			float spacing = ImGui::GetStyle().ItemSpacing.x;
+			float comboWidth = ImGui::GetContentRegionAvail().x - buttonWidth - spacing;
+			ImGui::SetNextItemWidth(comboWidth);
+
 			if (ImGui::Combo("##SelectionStyle", &gSelectionStyleIndex, selectionStyles, IM_ARRAYSIZE(selectionStyles)))
 			{
 				HookD3D12::gShaderSelectionStyle = (HookD3D12::ShaderSelectionStyle)gSelectionStyleIndex;
 				HookD3D12::ClearShaderMarkers();
 				HookD3D12::InvalidateShaderMarkerPSOs();
 			}
+			if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip(tooltipSelectonStyle);
+
+			ImGui::SameLine();
+			if (ImGui::Button(btnLabel))
+				HookD3D12::ClearShaderMarkers();
+			if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip(tooltipClearSelections);
 
 			ImGui::Spacing();
 
@@ -148,6 +181,8 @@ namespace ShaderInjectorGUI
 
 			if (ImGui::Button("Refresh Shader Replacements"))
 				HookD3D12::RefreshLoadedShaderReplacements();
+
+			if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip(tooltipRefreshShaderReplacements);
 
 			if (HookD3D12::gLoadedShaderReplacements.empty())
 			{
@@ -219,6 +254,7 @@ namespace ShaderInjectorGUI
 			if (ImGui::Checkbox("##ShaderReplacementEnable", &replacement.enabled))
 				HookD3D12::MarkShaderReplacementApplyDirty();
 			ImGui::SameLine();
+			if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip(tooltipEnableShaderReplacement);
 
 			if (ImGui::Button("Delete"))
 			{
@@ -226,14 +262,11 @@ namespace ShaderInjectorGUI
 				return;
 			}
 
-			ImGui::Text("Name");
-			ImGui::SameLine();
-			if (ImGui::InputText("##ShaderReplacementName", HookD3D12::gShaderReplacementNameBuffer, sizeof(HookD3D12::gShaderReplacementNameBuffer)))
-				replacement.name = HookD3D12::gShaderReplacementNameBuffer;
+			if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip(tooltipDeleteShaderReplacement);
 
 			ImGui::Spacing();
 
-			ImGui::Text("Shader Type: %s", ShaderReplacement::ShaderTypeToString(replacement.shaderType).c_str());
+			ImGui::Text("Shader Type: %s", StringHelper::ShaderTypeToString(replacement.shaderType).c_str());
 
 			ImGui::Spacing();
 			ImGui::Unindent(indentSpace);
@@ -282,7 +315,7 @@ namespace ShaderInjectorGUI
 
 		ImGui::Spacing();
 		ImGui::Text("Source Folder: %s", ShaderInjectorIO::GetShaderSourcesDirectory(DatabaseShaderSources::ShaderSourceSubdirectoryForType(replacement.shaderType)).c_str());
-		ImGui::Text("Source Shader: ");
+		ImGui::Text("Source Shader:");
 		ImGui::SameLine();
 
 		const char* btnLabel = "Refresh Shader Sources";
@@ -311,9 +344,12 @@ namespace ShaderInjectorGUI
 			ImGui::EndCombo();
 		}
 
+		if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip(tooltipShaderSourcesCombobox);
+
 		ImGui::SameLine();
 		if (ImGui::Button(btnLabel))
 			DatabaseShaderSources::RefreshShaderSources(replacement.shaderType);
+		if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip(tooltipRefreshShaderSourcesButton);
 
 		if (ImGui::Button("Rebuild Shader Replacement"))
 		{
@@ -321,6 +357,8 @@ namespace ShaderInjectorGUI
 			HookD3D12::ReloadShaderReplacement(replacementIndex);
 			HookD3D12::SaveShaderReplacement(replacementIndex);
 		}
+
+		if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip(tooltipShaderReplacementRebuildButton);
 
 		ImGui::Spacing();
 		ImGui::Unindent(indentSpace);
@@ -371,7 +409,7 @@ namespace ShaderInjectorGUI
 		ImGui::Text("Original: %p", pipeline.pipelineState);
 		ImGui::Text("Replacement: %p", pipeline.psoWithReplacement);
 		ImGui::SameLine();
-		ImGui::Text("Type: %s", ShaderReplacement::ShaderTypeToString(pipeline.activeShaderReplacementType).c_str());
+		ImGui::Text("Type: %s", StringHelper::ShaderTypeToString(pipeline.activeShaderReplacementType).c_str());
 		ImGui::Text("Hash: %s", Hash::FormatHash(pipeline.activeShaderReplacementHash).c_str());
 
 		if (pipeline.activeShaderReplacementUsesFallback)
@@ -472,19 +510,19 @@ namespace ShaderInjectorGUI
 		if (ImGui::CollapsingHeader(headerText.c_str()))
 		{
 			UI_ShaderStageList<HookD3D12::GraphicsPipelineInfo, &HookD3D12::GraphicsPipelineInfo::psHash, &HookD3D12::GraphicsPipelineInfo::psSize, &HookD3D12::GraphicsPipelineInfo::psBytecode>(
-				"Pixel Shaders", "GraphicsPS", "Graphics", HookD3D12::gGraphicsPipelines, ShaderReplacement::PixelShader, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PS, HookD3D12::PSOPendingRebuild::SourceList::Graphics, true, &HookD3D12::GraphicsPipelineInfo::psDisabled, &HookD3D12::GraphicsPipelineInfo::psoWithoutPS);
+				"Pixel Shaders", "GraphicsPS", "Graphics", HookD3D12::gGraphicsPipelines, ShaderReplacement::PixelShader, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PS, HookD3D12::PSOPendingRebuild::SourceList::Graphics, true, true, &HookD3D12::GraphicsPipelineInfo::psDisabled, &HookD3D12::GraphicsPipelineInfo::psoWithoutPS);
 
 			UI_ShaderStageList<HookD3D12::GraphicsPipelineInfo, &HookD3D12::GraphicsPipelineInfo::vsHash, &HookD3D12::GraphicsPipelineInfo::vsSize, &HookD3D12::GraphicsPipelineInfo::vsBytecode>(
-				"Vertex Shaders", "GraphicsVS", "Graphics", HookD3D12::gGraphicsPipelines, ShaderReplacement::VertexShader, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_VS, HookD3D12::PSOPendingRebuild::SourceList::Graphics, false, nullptr, nullptr);
+				"Vertex Shaders", "GraphicsVS", "Graphics", HookD3D12::gGraphicsPipelines, ShaderReplacement::VertexShader, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_VS, HookD3D12::PSOPendingRebuild::SourceList::Graphics, false, true, nullptr, nullptr);
 
 			UI_ShaderStageList<HookD3D12::GraphicsPipelineInfo, &HookD3D12::GraphicsPipelineInfo::gsHash, &HookD3D12::GraphicsPipelineInfo::gsSize, &HookD3D12::GraphicsPipelineInfo::gsBytecode>(
-				"Geometry Shaders", "GraphicsGS", "Graphics", HookD3D12::gGraphicsPipelines, ShaderReplacement::GeometryShader, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_GS, HookD3D12::PSOPendingRebuild::SourceList::Graphics, false, nullptr, nullptr);
+				"Geometry Shaders", "GraphicsGS", "Graphics", HookD3D12::gGraphicsPipelines, ShaderReplacement::GeometryShader, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_GS, HookD3D12::PSOPendingRebuild::SourceList::Graphics, false, true, nullptr, nullptr);
 
 			UI_ShaderStageList<HookD3D12::GraphicsPipelineInfo, &HookD3D12::GraphicsPipelineInfo::hsHash, &HookD3D12::GraphicsPipelineInfo::hsSize, &HookD3D12::GraphicsPipelineInfo::hsBytecode>(
-				"Hull Shaders", "GraphicsHS", "Graphics", HookD3D12::gGraphicsPipelines, ShaderReplacement::HullShader, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_HS, HookD3D12::PSOPendingRebuild::SourceList::Graphics, false, nullptr, nullptr);
+				"Hull Shaders", "GraphicsHS", "Graphics", HookD3D12::gGraphicsPipelines, ShaderReplacement::HullShader, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_HS, HookD3D12::PSOPendingRebuild::SourceList::Graphics, false, true, nullptr, nullptr);
 
 			UI_ShaderStageList<HookD3D12::GraphicsPipelineInfo, &HookD3D12::GraphicsPipelineInfo::dsHash, &HookD3D12::GraphicsPipelineInfo::dsSize, &HookD3D12::GraphicsPipelineInfo::dsBytecode>(
-				"Domain Shaders", "GraphicsDS", "Graphics", HookD3D12::gGraphicsPipelines, ShaderReplacement::DomainShader, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DS, HookD3D12::PSOPendingRebuild::SourceList::Graphics, false, nullptr, nullptr);
+				"Domain Shaders", "GraphicsDS", "Graphics", HookD3D12::gGraphicsPipelines, ShaderReplacement::DomainShader, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DS, HookD3D12::PSOPendingRebuild::SourceList::Graphics, false, true, nullptr, nullptr);
 		}
 	}
 	*/
@@ -500,29 +538,32 @@ namespace ShaderInjectorGUI
 		if (ImGui::CollapsingHeader(headerText.c_str()))
 		{
 			UI_ShaderStageList<HookD3D12::PipelineStateInfo, &HookD3D12::PipelineStateInfo::psHash, &HookD3D12::PipelineStateInfo::psSize, &HookD3D12::PipelineStateInfo::psBytecode>(
-				"Pixel Shaders", "StreamPS", "Stream", HookD3D12::gPipelineStates, ShaderReplacement::PixelShader, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PS, HookD3D12::PSOPendingRebuild::SourceList::Stream, true, &HookD3D12::PipelineStateInfo::psDisabled, &HookD3D12::PipelineStateInfo::psoWithoutPS);
+				"Pixel Shaders", "StreamPS", "Stream", HookD3D12::gPipelineStates, ShaderReplacement::PixelShader, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PS, HookD3D12::PSOPendingRebuild::SourceList::Stream, true, false, &HookD3D12::PipelineStateInfo::psDisabled, &HookD3D12::PipelineStateInfo::psoWithoutPS);
 
 			UI_ShaderStageList<HookD3D12::PipelineStateInfo, &HookD3D12::PipelineStateInfo::csHash, &HookD3D12::PipelineStateInfo::csSize, &HookD3D12::PipelineStateInfo::csBytecode>(
-				"Compute Shaders", "StreamCS", "Stream", HookD3D12::gPipelineStates, ShaderReplacement::ComputeShader, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_CS, HookD3D12::PSOPendingRebuild::SourceList::Stream, true, &HookD3D12::PipelineStateInfo::csDisabled, &HookD3D12::PipelineStateInfo::psoWithoutCS);
+				"Compute Shaders", "StreamCS", "Stream", HookD3D12::gPipelineStates, ShaderReplacement::ComputeShader, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_CS, HookD3D12::PSOPendingRebuild::SourceList::Stream, true, true, &HookD3D12::PipelineStateInfo::csDisabled, &HookD3D12::PipelineStateInfo::psoWithoutCS);
 
 			UI_ShaderStageList<HookD3D12::PipelineStateInfo, &HookD3D12::PipelineStateInfo::vsHash, &HookD3D12::PipelineStateInfo::vsSize, &HookD3D12::PipelineStateInfo::vsBytecode>(
-				"Vertex Shaders", "StreamVS", "Stream", HookD3D12::gPipelineStates, ShaderReplacement::VertexShader, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_VS, HookD3D12::PSOPendingRebuild::SourceList::Stream, true, &HookD3D12::PipelineStateInfo::vsDisabled, &HookD3D12::PipelineStateInfo::psoWithoutVS);
+				"Vertex Shaders", "StreamVS", "Stream", HookD3D12::gPipelineStates, ShaderReplacement::VertexShader, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_VS, HookD3D12::PSOPendingRebuild::SourceList::Stream, true, true, &HookD3D12::PipelineStateInfo::vsDisabled, &HookD3D12::PipelineStateInfo::psoWithoutVS);
 
 			UI_ShaderStageList<HookD3D12::PipelineStateInfo, &HookD3D12::PipelineStateInfo::gsHash, &HookD3D12::PipelineStateInfo::gsSize, &HookD3D12::PipelineStateInfo::gsBytecode>(
-				"Geometry Shaders", "StreamGS", "Stream", HookD3D12::gPipelineStates, ShaderReplacement::GeometryShader, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_GS, HookD3D12::PSOPendingRebuild::SourceList::Stream, true, &HookD3D12::PipelineStateInfo::gsDisabled, &HookD3D12::PipelineStateInfo::psoWithoutGS);
+				"Geometry Shaders", "StreamGS", "Stream", HookD3D12::gPipelineStates, ShaderReplacement::GeometryShader, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_GS, HookD3D12::PSOPendingRebuild::SourceList::Stream, true, true, &HookD3D12::PipelineStateInfo::gsDisabled, &HookD3D12::PipelineStateInfo::psoWithoutGS);
 
 			UI_ShaderStageList<HookD3D12::PipelineStateInfo, &HookD3D12::PipelineStateInfo::hsHash, &HookD3D12::PipelineStateInfo::hsSize, &HookD3D12::PipelineStateInfo::hsBytecode>(
-				"Hull Shaders", "StreamHS", "Stream", HookD3D12::gPipelineStates, ShaderReplacement::HullShader, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_HS, HookD3D12::PSOPendingRebuild::SourceList::Stream, true, &HookD3D12::PipelineStateInfo::hsDisabled, &HookD3D12::PipelineStateInfo::psoWithoutHS);
+				"Hull Shaders", "StreamHS", "Stream", HookD3D12::gPipelineStates, ShaderReplacement::HullShader, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_HS, HookD3D12::PSOPendingRebuild::SourceList::Stream, true, true, &HookD3D12::PipelineStateInfo::hsDisabled, &HookD3D12::PipelineStateInfo::psoWithoutHS);
 
 			UI_ShaderStageList<HookD3D12::PipelineStateInfo, &HookD3D12::PipelineStateInfo::dsHash, &HookD3D12::PipelineStateInfo::dsSize, &HookD3D12::PipelineStateInfo::dsBytecode>(
-				"Domain Shaders", "StreamDS", "Stream", HookD3D12::gPipelineStates, ShaderReplacement::DomainShader, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DS, HookD3D12::PSOPendingRebuild::SourceList::Stream, true, &HookD3D12::PipelineStateInfo::dsDisabled, &HookD3D12::PipelineStateInfo::psoWithoutDS);
+				"Domain Shaders", "StreamDS", "Stream", HookD3D12::gPipelineStates, ShaderReplacement::DomainShader, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DS, HookD3D12::PSOPendingRebuild::SourceList::Stream, true, true, &HookD3D12::PipelineStateInfo::dsDisabled, &HookD3D12::PipelineStateInfo::psoWithoutDS);
 		}
 		else
 		{
 			HookD3D12::ClearShaderMarkers();
 		}
+
+		if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip(tooltipStreamPipelinesHeader);
 	}
 
+	//UI "Template" for each of the shader stages
 	template<
 		typename PipelineT,
 		uint64_t PipelineT::* HashMember,
@@ -537,6 +578,7 @@ namespace ShaderInjectorGUI
 		D3D12_PIPELINE_STATE_SUBOBJECT_TYPE subobjectType,
 		HookD3D12::PSOPendingRebuild::SourceList pendingSource,
 		bool allowMarkerToggle,
+		bool disableActions,
 		bool PipelineT::* disabledMember,
 		ID3D12PipelineState* PipelineT::* rebuiltPSOMember)
 	{
@@ -696,24 +738,33 @@ namespace ShaderInjectorGUI
 			return;
 		}
 
-		std::string dumpButtonLabel = std::string("Dump Bytecode##") + idPrefix;
-		if (ImGui::Button(dumpButtonLabel.c_str()))
+		if (!disableActions)
 		{
-			ShaderInjectorIO::DumpShaderBytecode(bytecode.data(), bytecode.size(), hash, ShaderReplacement::ShaderTypeToString(shaderType), ShaderInjectorIO::GetDumpsDirectory());
-		}
+			std::string createTemplateButtonLabel = std::string("Create Replacement Shader Template##") + idPrefix;
+			if (ImGui::Button(createTemplateButtonLabel.c_str()))
+			{
+				HookD3D12::CreateReplacementShaderTemplateForPipeline(
+					sourceList,
+					selectedIndex,
+					shaderType,
+					hash,
+					bytecode.size(),
+					bytecode.data(),
+					pipeline);
 
-		ImGui::SameLine();
-		std::string createTemplateButtonLabel = std::string("Create Replacement Shader Template##") + idPrefix;
-		if (ImGui::Button(createTemplateButtonLabel.c_str()))
-		{
-			HookD3D12::CreateReplacementShaderTemplateForPipeline(
-				sourceList,
-				selectedIndex,
-				shaderType,
-				hash,
-				bytecode.size(),
-				bytecode.data(),
-				pipeline);
+				//clear markers because they can get annoyingly sticky
+				HookD3D12::ClearShaderMarkers();
+			}
+			if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip(tooltipCreateReplacementShaderTemplate);
+
+			ImGui::SameLine();
+
+			std::string dumpButtonLabel = std::string("Dump Bytecode##") + idPrefix;
+			if (ImGui::Button(dumpButtonLabel.c_str()))
+			{
+				ShaderInjectorIO::DumpShaderBytecode(bytecode.data(), bytecode.size(), hash, StringHelper::ShaderTypeToString(shaderType), ShaderInjectorIO::GetDumpsDirectory());
+			}
+			if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip(tooltipDumpBytecode);
 		}
 
 		ImGui::TreePop();
@@ -750,36 +801,6 @@ namespace ShaderInjectorGUI
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| RUNTIME LOGS |||||||||||||||||||||||||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| RUNTIME LOGS |||||||||||||||||||||||||||||||||||||||||||||||||||||
 
-	void UI_RuntimeLogTextBox(const std::string* logText)
-	{
-		static std::string cachedLogText;
-		static std::vector<char> logBuffer;
-
-		if (!logText)
-			return;
-
-		if (cachedLogText != *logText)
-		{
-			cachedLogText = *logText;
-			logBuffer.assign(cachedLogText.begin(), cachedLogText.end());
-			logBuffer.push_back('\0');
-		}
-
-		if (logBuffer.empty())
-			logBuffer.push_back('\0');
-
-		const ImVec2 available = ImGui::GetContentRegionAvail();
-		const float logHeight = available.y > 140.0f ? available.y : 140.0f;
-		const ImGuiInputTextFlags flags = ImGuiInputTextFlags_ReadOnly | ImGuiInputTextFlags_NoHorizontalScroll;
-
-		ImGui::InputTextMultiline(
-			"##RuntimeLogText",
-			logBuffer.data(),
-			logBuffer.size(),
-			ImVec2(-FLT_MIN, logHeight),
-			flags);
-	}
-
 	void WriteToRuntimeLog(std::string text)
 	{
 		runtimeLogText += "\n";
@@ -805,5 +826,94 @@ namespace ShaderInjectorGUI
 	void ClearRuntimeLog()
 	{
 		runtimeLogText = "";
+	}
+
+	void UI_ApplyStyle()
+	{
+		ImGuiStyle& style = ImGui::GetStyle();
+
+		//cool rounding and spacing!
+		style.WindowRounding = 6.0f;
+		style.FrameRounding = 4.0f;
+		style.ScrollbarRounding = 4.0f;
+		style.GrabRounding = 4.0f;
+		style.TabRounding = 4.0f;
+		style.WindowPadding = ImVec2(10.0f, 10.0f);
+		style.FramePadding = ImVec2(6.0f, 4.0f);
+		style.ItemSpacing = ImVec2(8.0f, 6.0f);
+		style.ScrollbarSize = 12.0f;
+
+		ImVec4* c = style.Colors;
+
+		//accents for hover / active / grab
+		const ImVec4 accent = ImVec4(0.25f, 0.45f, 0.70f, 1.00f);
+		const ImVec4 accentHovered = ImVec4(0.35f, 0.55f, 0.80f, 1.00f);
+		const ImVec4 accentActive = ImVec4(0.20f, 0.38f, 0.62f, 1.00f);
+
+		//text
+		c[ImGuiCol_Text] = ImVec4(0.88f, 0.88f, 0.88f, 1.00f);
+		c[ImGuiCol_TextDisabled] = ImVec4(0.40f, 0.40f, 0.40f, 1.00f);
+
+		//window, background surfaces
+		c[ImGuiCol_WindowBg] = ImVec4(0.11f, 0.11f, 0.11f, 1.00f);
+		c[ImGuiCol_ChildBg] = ImVec4(0.13f, 0.13f, 0.13f, 1.00f);
+		c[ImGuiCol_PopupBg] = ImVec4(0.10f, 0.10f, 0.10f, 1.00f);
+
+		//borders
+		c[ImGuiCol_Border] = ImVec4(0.22f, 0.22f, 0.22f, 1.00f);
+		c[ImGuiCol_BorderShadow] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+
+		//title bar
+		c[ImGuiCol_TitleBg] = ImVec4(0.08f, 0.08f, 0.08f, 1.00f);
+		c[ImGuiCol_TitleBgActive] = ImVec4(0.10f, 0.10f, 0.10f, 1.00f);
+		c[ImGuiCol_TitleBgCollapsed] = ImVec4(0.08f, 0.08f, 0.08f, 0.75f);
+
+		//frames (inputText, sliders)
+		c[ImGuiCol_FrameBg] = ImVec4(0.18f, 0.18f, 0.18f, 1.00f);
+		c[ImGuiCol_FrameBgHovered] = accentHovered;
+		c[ImGuiCol_FrameBgActive] = accentActive;
+
+		//buttons
+		c[ImGuiCol_Button] = ImVec4(0.22f, 0.22f, 0.22f, 1.00f);
+		c[ImGuiCol_ButtonHovered] = accentHovered;
+		c[ImGuiCol_ButtonActive] = accentActive;
+
+		//headers (collapsingHeader, selectable, treeNode)
+		c[ImGuiCol_Header] = ImVec4(0.22f, 0.22f, 0.22f, 1.00f);
+		c[ImGuiCol_HeaderHovered] = accentHovered;
+		c[ImGuiCol_HeaderActive] = accentActive;
+
+		//tabs ---
+		c[ImGuiCol_Tab] = ImVec4(0.15f, 0.15f, 0.15f, 1.00f);
+		c[ImGuiCol_TabHovered] = accentHovered;
+		c[ImGuiCol_TabActive] = accent;
+		c[ImGuiCol_TabUnfocused] = ImVec4(0.13f, 0.13f, 0.13f, 1.00f);
+		c[ImGuiCol_TabUnfocusedActive] = ImVec4(0.20f, 0.20f, 0.20f, 1.00f);
+
+		//checkmark / slider grab
+		c[ImGuiCol_CheckMark] = accentHovered;
+		c[ImGuiCol_SliderGrab] = ImVec4(0.40f, 0.40f, 0.40f, 1.00f);
+		c[ImGuiCol_SliderGrabActive] = accentActive;
+
+		//scrollbar
+		c[ImGuiCol_ScrollbarBg] = ImVec4(0.10f, 0.10f, 0.10f, 1.00f);
+		c[ImGuiCol_ScrollbarGrab] = ImVec4(0.28f, 0.28f, 0.28f, 1.00f);
+		c[ImGuiCol_ScrollbarGrabHovered] = accentHovered;
+		c[ImGuiCol_ScrollbarGrabActive] = accentActive;
+
+		//resize grip
+		c[ImGuiCol_ResizeGrip] = ImVec4(0.22f, 0.22f, 0.22f, 0.50f);
+		c[ImGuiCol_ResizeGripHovered] = accentHovered;
+		c[ImGuiCol_ResizeGripActive] = accentActive;
+
+		//separator
+		c[ImGuiCol_Separator] = ImVec4(0.25f, 0.25f, 0.25f, 1.00f);
+		c[ImGuiCol_SeparatorHovered] = accentHovered;
+		c[ImGuiCol_SeparatorActive] = accentActive;
+
+		//other
+		c[ImGuiCol_MenuBarBg] = ImVec4(0.12f, 0.12f, 0.12f, 1.00f);
+		c[ImGuiCol_ModalWindowDimBg] = ImVec4(0.00f, 0.00f, 0.00f, 0.45f);
+		c[ImGuiCol_NavHighlight] = accent;
 	}
 }

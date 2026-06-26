@@ -1,53 +1,40 @@
-#include "Hooks.h"
-#include "PreCompiledHeader.h"
-#include <windows.h>
-#include "dsound_proxy.h"
-#include "MinHook.h"
-#include <cstdio>
-#include "Globals.h"
-#include "HookD3D12.h"
-#include <dxgi1_4.h>
+//Hooks.cpp
 #include "wrl/client.h"
+#include <windows.h>
+#include <cstdio>
+#include <dxgi1_4.h>
 #include <dxgi.h>
 #include <d3d12.h>
+
+//3RD Party
+#include "MinHook.h"
+
+//custom
+#include "Hooks.h"
+#include "dsound_proxy.h"
+#include "Globals.h"
+#include "HookD3D12.h"
 #include "ShaderInjectorIO.h"
 #include "ShaderInjectorGUI.h"
 #include "VTableIndex.h"
 
 namespace Hooks
 {
-	//dummy objects for v tables
-	static Microsoft::WRL::ComPtr<IDXGISwapChain3>           pSwapChain = nullptr;
-	static Microsoft::WRL::ComPtr<ID3D12Device>              pDevice = nullptr;
-	static Microsoft::WRL::ComPtr<ID3D12CommandQueue>        pCommandQueue = nullptr;
-	static Microsoft::WRL::ComPtr<ID3D12CommandAllocator>    pCommandAllocator = nullptr;
-	static Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> pCommandList = nullptr;
-	static HWND hDummyWindow = nullptr;
-	static const wchar_t* dummyClassName = L"DummyWndClass";
+	// Dummy objects are created only to discover D3D12/DXGI vtable addresses for MinHook.
+	static Microsoft::WRL::ComPtr<IDXGISwapChain3>           gDummySwapChain = nullptr;
+	static Microsoft::WRL::ComPtr<ID3D12Device>              gDummyDevice = nullptr;
+	static Microsoft::WRL::ComPtr<ID3D12CommandQueue>        gDummyCommandQueue = nullptr;
+	static Microsoft::WRL::ComPtr<ID3D12CommandAllocator>    gDummyCommandAllocator = nullptr;
+	static Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> gDummyCommandList = nullptr;
+	static HWND gDummyWindow = nullptr;
+	static const wchar_t* gDummyWindowClassName = L"DummyWndClass";
 
-	static LPVOID pPresentTarget = nullptr;
-	static LPVOID pPresent1Target = nullptr;
-	static LPVOID pResizeBuffersTarget = nullptr;
-	static LPVOID pExecuteCommandListsTarget = nullptr;
+	static LPVOID gPresentTarget = nullptr;
+	static LPVOID gPresent1Target = nullptr;
+	static LPVOID gResizeBuffersTarget = nullptr;
+	static LPVOID gExecuteCommandListsTarget = nullptr;
 
-	static void CleanupDummyObjects()
-	{
-		if (hDummyWindow)
-		{
-			DestroyWindow(hDummyWindow);
-			hDummyWindow = nullptr;
-		}
-
-		UnregisterClassW(dummyClassName, GetModuleHandle(nullptr));
-
-		pCommandList.Reset();
-		pCommandAllocator.Reset();
-		pSwapChain.Reset();
-		pCommandQueue.Reset();
-		pDevice.Reset();
-	}
-
-	// Create hidden Window + device + DX12 swapchain
+	//create a hidden window, device, command queue, command list, and swap chain so we can read correct vtables on the machine (the game never sees these objects)
 	static HRESULT CreateDeviceAndSwapChain()
 	{
 		ShaderInjectorGUI::WriteToRuntimeLog("Hooks->CreateDeviceAndSwapChain: creating device and swap chain...");
@@ -63,7 +50,7 @@ namespace Hooks
 			0, 0,
 			GetModuleHandleW(nullptr),
 			nullptr, nullptr, nullptr, nullptr,
-			dummyClassName,
+			gDummyWindowClassName,
 			nullptr
 		};
 
@@ -80,14 +67,14 @@ namespace Hooks
 		//============================== 2) Create hidden window ==============================
 		ShaderInjectorGUI::WriteToRuntimeLog("Hooks->CreateDeviceAndSwapChain: creating hidden window...");
 
-		hDummyWindow = CreateWindowExW(
-			0, dummyClassName, L"Dummy",
+		gDummyWindow = CreateWindowExW(
+			0, gDummyWindowClassName, L"Dummy",
 			WS_OVERLAPPEDWINDOW,
 			0, 0, 1, 1,
 			nullptr, nullptr, windowClass.hInstance, nullptr
 		);
 
-		if (!hDummyWindow) 
+		if (!gDummyWindow) 
 		{
 			char buffer[256];
 			sprintf_s(buffer, "Hooks->CreateDeviceAndSwapChain: CreateWindowExW failed: %u\n", GetLastError());
@@ -114,7 +101,7 @@ namespace Hooks
 		//============================== 4) Device D3D12 ==============================
 		ShaderInjectorGUI::WriteToRuntimeLog("Hooks->CreateDeviceAndSwapChain: D3D12CreateDevice...");
 
-		HRESULT createdD3D12DeviceResult = D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&pDevice));
+		HRESULT createdD3D12DeviceResult = D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&gDummyDevice));
 
 		if (FAILED(createdD3D12DeviceResult))
 		{
@@ -131,7 +118,7 @@ namespace Hooks
 		D3D12_COMMAND_QUEUE_DESC commandQueueDescription = {};
 		commandQueueDescription.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 		commandQueueDescription.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-		HRESULT createCommandQueueResult = pDevice->CreateCommandQueue(&commandQueueDescription, IID_PPV_ARGS(&pCommandQueue));
+		HRESULT createCommandQueueResult = gDummyDevice->CreateCommandQueue(&commandQueueDescription, IID_PPV_ARGS(&gDummyCommandQueue));
 
 		if (FAILED(createCommandQueueResult))
 		{
@@ -145,9 +132,9 @@ namespace Hooks
 		//============================== 6) Command List ==============================
 		ShaderInjectorGUI::WriteToRuntimeLog("Hooks->CreateDeviceAndSwapChain: CreateCommandAllocator...");
 
-		HRESULT createCommandAllocatorResult = pDevice->CreateCommandAllocator(
+		HRESULT createCommandAllocatorResult = gDummyDevice->CreateCommandAllocator(
 			D3D12_COMMAND_LIST_TYPE_DIRECT,
-			IID_PPV_ARGS(&pCommandAllocator));
+			IID_PPV_ARGS(&gDummyCommandAllocator));
 
 		if (FAILED(createCommandAllocatorResult))
 		{
@@ -161,12 +148,12 @@ namespace Hooks
 		//============================== 7) Command List ==============================
 		ShaderInjectorGUI::WriteToRuntimeLog("Hooks->CreateDeviceAndSwapChain: CreateCommandList...");
 
-		HRESULT createCommandListResult = pDevice->CreateCommandList(
+		HRESULT createCommandListResult = gDummyDevice->CreateCommandList(
 			0,
 			D3D12_COMMAND_LIST_TYPE_DIRECT,
-			pCommandAllocator.Get(),
+			gDummyCommandAllocator.Get(),
 			nullptr,
-			IID_PPV_ARGS(&pCommandList));
+			IID_PPV_ARGS(&gDummyCommandList));
 
 		if (FAILED(createCommandListResult))
 		{
@@ -176,7 +163,7 @@ namespace Hooks
 			return createCommandListResult;
 		}
 
-		pCommandList->Close();
+		gDummyCommandList->Close();
 		ShaderInjectorGUI::WriteToRuntimeLog("Hooks->CreateDeviceAndSwapChain: CreateCommandList Success!");
 		//============================== 8) SwapChainDesc1 ==============================
 		ShaderInjectorGUI::WriteToRuntimeLog("Hooks->CreateDeviceAndSwapChain: CreateSwapChainForHwnd...");
@@ -192,8 +179,8 @@ namespace Hooks
 
 		Microsoft::WRL::ComPtr<IDXGISwapChain1> swapChain1;
 		HRESULT createSwapChain1Result = dxgiFactory4->CreateSwapChainForHwnd(
-			pCommandQueue.Get(),
-			hDummyWindow,
+			gDummyCommandQueue.Get(),
+			gDummyWindow,
 			&swapChainDescription,
 			nullptr, nullptr,
 			&swapChain1
@@ -211,7 +198,7 @@ namespace Hooks
 		//============================== 9) Query IDXGISwapChain3 ==============================
 		ShaderInjectorGUI::WriteToRuntimeLog("Hooks->CreateDeviceAndSwapChain: querying IDXGISwapChain3...");
 
-		HRESULT swapChainQueryResult = swapChain1.As(&pSwapChain);
+		HRESULT swapChainQueryResult = swapChain1.As(&gDummySwapChain);
 
 		if (FAILED(swapChainQueryResult))
 		{
@@ -225,11 +212,11 @@ namespace Hooks
 		return S_OK;
 	}
 
-	void Initalize() 
+	void Initialize()
 	{
 		//IMPORTANT NOTE 1: We are able to get to this point and call this function
 		//NOTE: keep this comment around for sanity check please!
-		ShaderInjectorGUI::WriteToRuntimeLog("Hooks->Initalize: initalizing hooks...");
+		ShaderInjectorGUI::WriteToRuntimeLog("Hooks->Initialize: initalizing hooks...");
 
 		struct CleanupGuard 
 		{
@@ -243,7 +230,7 @@ namespace Hooks
 
 		if (FAILED(createDeviceAndSwapChainResult))
 		{
-			ShaderInjectorGUI::WriteToRuntimeLogError("Hooks->Initalize: Failed to create dummy device/swapchain.");
+			ShaderInjectorGUI::WriteToRuntimeLogError("Hooks->Initialize: Failed to create dummy device/swapchain.");
 			return;
 		}
 
@@ -260,57 +247,57 @@ namespace Hooks
 
 		//======================================== Collect V-Tables ========================================
 
-		auto swapChainVTable = *reinterpret_cast<void***>(pSwapChain.Get());
-		auto commandQueueVTable = *reinterpret_cast<void***>(pCommandQueue.Get());
+		auto swapChainVTable = *reinterpret_cast<void***>(gDummySwapChain.Get());
+		auto commandQueueVTable = *reinterpret_cast<void***>(gDummyCommandQueue.Get());
 
-		HookD3D12::InstallPipelineHooksForDevice(pDevice.Get());
-		HookD3D12::InstallCommandListHooksForCommandList(pCommandList.Get());
+		HookD3D12::InstallPipelineHooksForDevice(gDummyDevice.Get());
+		HookD3D12::InstallCommandListHooksForCommandList(gDummyCommandList.Get());
 
 		//======================================== Hook Start ========================================
 
 		MH_STATUS minHookStatus;
 
 		//======================================== Hook_PresentD3D12 ========================================
-		pPresentTarget = reinterpret_cast<LPVOID>(swapChainVTable[VTableIndex::indexPresent]);
-		minHookStatus = MH_CreateHook(pPresentTarget, reinterpret_cast<LPVOID>(HookD3D12::Hook_PresentD3D12), reinterpret_cast<LPVOID*>(&HookD3D12::Original_PresentD3D12));
+		gPresentTarget = reinterpret_cast<LPVOID>(swapChainVTable[VTableIndex::indexPresent]);
+		minHookStatus = MH_CreateHook(gPresentTarget, reinterpret_cast<LPVOID>(HookD3D12::Hook_PresentD3D12), reinterpret_cast<LPVOID*>(&HookD3D12::Original_PresentD3D12));
 		
 		if (minHookStatus != MH_OK)
 		{
 			char buffer[256];
-			sprintf_s(buffer, "Hooks->Initalize: MH_CreateHook Present failed: %s\n", MH_StatusToString(minHookStatus));
+			sprintf_s(buffer, "Hooks->Initialize: MH_CreateHook Present failed: %s\n", MH_StatusToString(minHookStatus));
 			ShaderInjectorGUI::WriteToRuntimeLogError(buffer);
 		}
 
 		//======================================== Hook_Present1D3D12 ========================================
-		pPresent1Target = reinterpret_cast<LPVOID>(swapChainVTable[VTableIndex::indexPresent1]);
-		minHookStatus = MH_CreateHook(pPresent1Target, reinterpret_cast<LPVOID>(HookD3D12::Hook_Present1D3D12), reinterpret_cast<LPVOID*>(&HookD3D12::Original_Present1D3D12));
+		gPresent1Target = reinterpret_cast<LPVOID>(swapChainVTable[VTableIndex::indexPresent1]);
+		minHookStatus = MH_CreateHook(gPresent1Target, reinterpret_cast<LPVOID>(HookD3D12::Hook_Present1D3D12), reinterpret_cast<LPVOID*>(&HookD3D12::Original_Present1D3D12));
 
 		if (minHookStatus != MH_OK)
 		{
 			char buffer[256];
-			sprintf_s(buffer, "Hooks->Initalize: MH_CreateHook Present1 failed: %s\n", MH_StatusToString(minHookStatus));
+			sprintf_s(buffer, "Hooks->Initialize: MH_CreateHook Present1 failed: %s\n", MH_StatusToString(minHookStatus));
 			ShaderInjectorGUI::WriteToRuntimeLogError(buffer);
 		}
 
 		//======================================== Hook_ResizeBuffersD3D12 ========================================
-		pResizeBuffersTarget = reinterpret_cast<LPVOID>(swapChainVTable[VTableIndex::indexResizeBuffers]);
-		minHookStatus = MH_CreateHook(pResizeBuffersTarget, reinterpret_cast<LPVOID>(HookD3D12::Hook_ResizeBuffersD3D12), reinterpret_cast<LPVOID*>(&HookD3D12::Original_ResizeBuffersD3D12));
+		gResizeBuffersTarget = reinterpret_cast<LPVOID>(swapChainVTable[VTableIndex::indexResizeBuffers]);
+		minHookStatus = MH_CreateHook(gResizeBuffersTarget, reinterpret_cast<LPVOID>(HookD3D12::Hook_ResizeBuffersD3D12), reinterpret_cast<LPVOID*>(&HookD3D12::Original_ResizeBuffersD3D12));
 
 		if (minHookStatus != MH_OK)
 		{
 			char buffer[256];
-			sprintf_s(buffer, "Hooks->Initalize: MH_CreateHook ResizeBuffers failed: %s\n", MH_StatusToString(minHookStatus));
+			sprintf_s(buffer, "Hooks->Initialize: MH_CreateHook ResizeBuffers failed: %s\n", MH_StatusToString(minHookStatus));
 			ShaderInjectorGUI::WriteToRuntimeLogError(buffer);
 		}
 
 		//======================================== Hook_ExecuteCommandListsD3D12 ========================================
-		pExecuteCommandListsTarget = reinterpret_cast<LPVOID>(commandQueueVTable[VTableIndex::indexExecuteCommandLists]);
-		minHookStatus = MH_CreateHook(pExecuteCommandListsTarget, reinterpret_cast<LPVOID>(HookD3D12::Hook_ExecuteCommandListsD3D12), reinterpret_cast<LPVOID*>(&HookD3D12::Original_ExecuteCommandListsD3D12));
+		gExecuteCommandListsTarget = reinterpret_cast<LPVOID>(commandQueueVTable[VTableIndex::indexExecuteCommandLists]);
+		minHookStatus = MH_CreateHook(gExecuteCommandListsTarget, reinterpret_cast<LPVOID>(HookD3D12::Hook_ExecuteCommandListsD3D12), reinterpret_cast<LPVOID*>(&HookD3D12::Original_ExecuteCommandListsD3D12));
 
 		if (minHookStatus != MH_OK)
 		{
 			char buffer[256];
-			sprintf_s(buffer, "Hooks->Initalize: MH_CreateHook ExecuteCommandLists failed: %s\n", MH_StatusToString(minHookStatus));
+			sprintf_s(buffer, "Hooks->Initialize: MH_CreateHook ExecuteCommandLists failed: %s\n", MH_StatusToString(minHookStatus));
 			ShaderInjectorGUI::WriteToRuntimeLogError(buffer);
 		}
 
@@ -321,21 +308,39 @@ namespace Hooks
 		if (minHookStatus != MH_OK)
 		{
 			char buffer[256];
-			sprintf_s(buffer, "Hooks->Initalize: MH_EnableHook failed: %s\n", MH_StatusToString(minHookStatus));
+			sprintf_s(buffer, "Hooks->Initialize: MH_EnableHook failed: %s\n", MH_StatusToString(minHookStatus));
 			ShaderInjectorGUI::WriteToRuntimeLogError(buffer);
 		}
 		else
 		{
-			ShaderInjectorGUI::WriteToRuntimeLog("Hooks->Initalize: Hooks enabled.");
+			ShaderInjectorGUI::WriteToRuntimeLog("Hooks->Initialize: Hooks enabled.");
+
 			/*
 			char buffer[256];
-			sprintf_s(buffer, "Hooks | Initalize | Hooks enabled. Present@%p (idx=%zu), Present1@%p (idx=%zu), Resize@%p (idx=%zu), Exec@%p (idx=%zu)\n",
+			sprintf_s(buffer, "Hooks->Initialize: Hooks enabled. Present@%p (idx=%zu), Present1@%p (idx=%zu), Resize@%p (idx=%zu), Exec@%p (idx=%zu)\n",
 				reinterpret_cast<LPVOID>(scVTable[kPresentIndex]), kPresentIndex,
 				reinterpret_cast<LPVOID>(scVTable[kPresent1Index]), kPresent1Index,
 				reinterpret_cast<LPVOID>(scVTable[kResizeBuffersIndex]), kResizeBuffersIndex,
 				reinterpret_cast<LPVOID>(cqVTable[kExecuteCommandListsIndex]), kExecuteCommandListsIndex);
-			MessageBoxA(nullptr, buffer, "Shader Injector", MB_OK);
+			ShaderInjectorGUI::WriteToRuntimeLog(buffer);
 			*/
 		}
+	}
+
+	void CleanupDummyObjects()
+	{
+		if (gDummyWindow)
+		{
+			DestroyWindow(gDummyWindow);
+			gDummyWindow = nullptr;
+		}
+
+		UnregisterClassW(gDummyWindowClassName, GetModuleHandle(nullptr));
+
+		gDummyCommandList.Reset();
+		gDummyCommandAllocator.Reset();
+		gDummySwapChain.Reset();
+		gDummyCommandQueue.Reset();
+		gDummyDevice.Reset();
 	}
 }

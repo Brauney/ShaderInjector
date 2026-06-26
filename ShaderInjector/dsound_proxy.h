@@ -1,6 +1,8 @@
 #pragma once
-#include "PreCompiledHeader.h"
-#include <Windows.h>
+
+#define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
+// Windows Header Files
+#include <windows.h>
 
 extern HMODULE g_realDsoundDll;
 

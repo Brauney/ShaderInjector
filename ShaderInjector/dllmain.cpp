@@ -1,8 +1,9 @@
 //dllmain.cpp
-#include "PreCompiledHeader.h"
 #include <windows.h>
-#include "MinHook.h"
 #include <cstdio>
+
+//3RD PARTY
+#include "MinHook.h"
 
 //custom
 #include "Globals.h"
@@ -30,12 +31,12 @@ static DWORD WINAPI OnAttachDLL(LPVOID)
 	//||||||||||||||||||||||||||||||| INITALIZE IO |||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||| INITALIZE IO |||||||||||||||||||||||||||||||
 
-	//initalize IO operations (folders, files, internal shader files)
-	ShaderInjectorIO::Initialize();
-
 	//clear log file on start so we start fresh
 	//TODO: make a "previous" log file to store results of last session
 	ShaderInjectorIO::PurgeLogFile();
+
+	//initalize IO operations (folders, files, internal shader files)
+	ShaderInjectorIO::Initialize();
 
 	//IMPORTANT NOTE 2: We are able to create and run this thread, so this does execute and work!
 	//NOTE 1: keep this comment around for sanity check please!
@@ -45,6 +46,10 @@ static DWORD WINAPI OnAttachDLL(LPVOID)
 	//||||||||||||||||||||||||||||||| SHADER |||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||| SHADER |||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||| SHADER |||||||||||||||||||||||||||||||
+	//here we are preparing our "internal" shader resources to be used by the injector.
+	//these are shaders that we use for various things, marking, error showing, etc.
+	//I prefer at this point in time to just rewrite the shaders based off a code template in the codebase
+	//then compile them right at the start, that way we start fresh, just in case the users for whatever reason tamper with them (or move/delete them)
 
 	ShaderInjectorIO::WriteToLogFile("dllmain->OnAttachDLL: getting null shader...");
 
@@ -137,9 +142,7 @@ static DWORD WINAPI OnAttachDLL(LPVOID)
 	//hook into d3d12 device creation and start hooking into many of it's calls
 	HookD3D12::InstallD3D12CreateDeviceHook(d3d12);
 
-	//ref - https://github.com/Sh0ckFR/Universal-Dear-ImGui-Hook/blob/master/dllmain.cpp
-	ShaderInjectorIO::WriteToLogFile("dllmain->OnAttachDLL: Attempting DX12 initialization...");
-	Hooks::Initalize();
+	Hooks::Initialize();
 
 	return 0;
 }

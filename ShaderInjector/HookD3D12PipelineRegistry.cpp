@@ -1,8 +1,8 @@
-#include "PreCompiledHeader.h"
-
-#include "HookD3D12PipelineRegistry.h"
-
+//HookD3D12PipelineRegistry.cpp
 #include <unordered_set>
+
+//custom
+#include "HookD3D12PipelineRegistry.h"
 
 namespace HookD3D12
 {

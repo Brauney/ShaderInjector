@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+
+//3RD Party
 #include "JsonHelper.h" //NLOHMANN
 
 namespace ShaderReplacement
@@ -18,7 +20,9 @@ namespace ShaderReplacement
 		Unknown        = 6,
 	};
 
-
+	//pipeline data structure dump, used for collecting as much information as possible
+	//this is really important so that on second runs of the application, we can dig through the cached PSOs
+	//replace the shader bytecode with our modified one, rebuild the PSO, and we should be set.
 	struct ShaderPipelineTemplateDisk
 	{
 		std::string name;
@@ -182,6 +186,7 @@ namespace ShaderReplacement
 
 		std::string notes;
 
+		//JSON support
 		NLOHMANN_ORDERED_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
 			ShaderReplacementDisk,
 			schemaVersion,
@@ -259,6 +264,7 @@ namespace ShaderReplacement
 		uint32_t inputSlotClass = 0;
 		uint32_t instanceDataStepRate = 0;
 
+		//JSON support
 		NLOHMANN_ORDERED_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
 			ShaderInputElementDisk,
 			semanticName,
@@ -278,6 +284,7 @@ namespace ShaderReplacement
 		uint32_t componentCount = 0;
 		uint32_t outputSlot = 0;
 
+		//JSON support
 		NLOHMANN_ORDERED_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
 			ShaderStreamOutputDeclarationDisk,
 			semanticName,
@@ -287,22 +294,19 @@ namespace ShaderReplacement
 			outputSlot)
 	};
 
-
 	struct ShaderPipelineStreamMetadataDisk
 	{
 		std::vector<ShaderInputElementDisk> inputElements;
 		std::vector<ShaderStreamOutputDeclarationDisk> streamOutputDeclarations;
 		std::vector<uint32_t> streamOutputStrides;
 
+		//JSON support
 		NLOHMANN_ORDERED_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
 			ShaderPipelineStreamMetadataDisk,
 			inputElements,
 			streamOutputDeclarations,
 			streamOutputStrides)
 	};
-
-	std::string ShaderTypeToString(ShaderReplacement::ShaderType shaderType);
-	std::string ShaderProfileForType(ShaderReplacement::ShaderType shaderType);
 
 	bool WriteShaderReplacementJson(const ShaderReplacement::ShaderReplacementDisk& replacement);
 	bool LoadShaderReplacementJson(const std::string& path, ShaderReplacement::ShaderReplacementDisk& outReplacement);

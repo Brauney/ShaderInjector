@@ -2,5 +2,7 @@
 
 namespace Hooks 
 {
-	extern void Initalize();
+	extern void Initialize();
+
+	void CleanupDummyObjects();
 }

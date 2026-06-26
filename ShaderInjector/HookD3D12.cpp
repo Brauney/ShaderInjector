@@ -1,3 +1,4 @@
+//HookD3D12.cpp
 #include <windows.h>
 #include <wrl/client.h>
 #include <vector>
@@ -34,7 +35,6 @@
 #include "imgui_impl_win32.h"
 
 //custom
-#include "PreCompiledHeader.h" //stupid precompiled header
 #include "Hooks.h"
 #include "Globals.h"
 #include "dsound_proxy.h"
@@ -54,6 +54,7 @@
 #include "HookD3D12OverlayStartup.h"
 #include "HookD3D12PipelineRegistry.h"
 #include "VTableIndex.h"
+#include "StringHelper.h"
 
 #if defined _M_X64
 typedef uint64_t uintx_t;
@@ -98,6 +99,10 @@ namespace HookD3D12
 	static bool gShaderReplacementApplyDirty = true;
 	static bool gPipelineStateOverridesDirty = true;
 	ShaderSelectionStyle gShaderSelectionStyle = ShaderSelectionStyle::BluePixelShader;
+
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| CREATE DEVICE |||||||||||||||||||||||||||||||||||||||||||||||||||||
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| CREATE DEVICE |||||||||||||||||||||||||||||||||||||||||||||||||||||
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| CREATE DEVICE |||||||||||||||||||||||||||||||||||||||||||||||||||||
 
 	void MarkShaderReplacementApplyDirty()
 	{
@@ -309,9 +314,13 @@ namespace HookD3D12
 		GatherD3D12PipelineInfo(swapChain, gDevice, gCommandQueue, gPipelineInfo);
 	}
 
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| HOOK - SET GRAPHICS ROOT SIGNATURE |||||||||||||||||||||||||||||||||||||||||||||||||||||
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| HOOK - SET GRAPHICS ROOT SIGNATURE |||||||||||||||||||||||||||||||||||||||||||||||||||||
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| HOOK - SET GRAPHICS ROOT SIGNATURE |||||||||||||||||||||||||||||||||||||||||||||||||||||
 
 	void STDMETHODCALLTYPE Hook_SetGraphicsRootSignature(ID3D12GraphicsCommandList* cmdList, ID3D12RootSignature* rootSignature)
-	{
+	{	
+		//IMPORTANT NOTE: brackets are important here, we need to limit the scope when collecting the root signature
 		{
 			std::lock_guard<std::mutex> lock(gPipelineMutex);
 			gCurrentGraphicsRootSignatureByCommandList[cmdList] = rootSignature;
@@ -320,8 +329,13 @@ namespace HookD3D12
 		Original_SetGraphicsRootSignature(cmdList, rootSignature);
 	}
 
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| HOOK - SET COMPUTE ROOT SIGNATURE |||||||||||||||||||||||||||||||||||||||||||||||||||||
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| HOOK - SET COMPUTE ROOT SIGNATURE |||||||||||||||||||||||||||||||||||||||||||||||||||||
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| HOOK - SET COMPUTE ROOT SIGNATURE |||||||||||||||||||||||||||||||||||||||||||||||||||||
+
 	void STDMETHODCALLTYPE Hook_SetComputeRootSignature(ID3D12GraphicsCommandList* cmdList, ID3D12RootSignature* rootSignature)
 	{
+		//IMPORTANT NOTE: brackets are important here, we need to limit the scope when collecting the root signature
 		{
 			std::lock_guard<std::mutex> lock(gPipelineMutex);
 			gCurrentComputeRootSignatureByCommandList[cmdList] = rootSignature;
@@ -376,7 +390,7 @@ namespace HookD3D12
 
 		if (!info.cachedBlob.empty())
 		{
-			std::string pointerText = PointerToString(pipelineState);
+			std::string pointerText = StringHelper::PointerToString(pipelineState);
 			std::replace(pointerText.begin(), pointerText.end(), ':', '_');
 			std::string path = ShaderInjectorIO::GetUncapturedPSODirectory() + "\\UncapturedPSO_" + Hash::FormatHash(info.cachedBlobHash) + "_" + pointerText + ShaderInjectorIO::extensionBIN;
 			ShaderInjectorIO::WriteBinaryFile(path, info.cachedBlob.data(), info.cachedBlob.size());
@@ -384,16 +398,9 @@ namespace HookD3D12
 
 		gUncapturedPipelineStates.push_back(info);
 
-		char buffer[384];
-		sprintf_s(
-			buffer,
-			"%s uncaptured PSO=%p cachedHash=%s cachedBytes=%zu",
-			reason ? reason : "Bound",
-			pipelineState,
-			info.cachedBlobHash ? Hash::FormatHash(info.cachedBlobHash).c_str() : "<none>",
-			(size_t)info.cachedBlobSize);
-
-		ShaderInjectorGUI::WriteToRuntimeLog(buffer);
+		//char buffer[384];
+		//sprintf_s(buffer, "HookD3D12->RecordUncapturedPipelineStateLocked: %s uncaptured PSO=%p cachedHash=%s cachedBytes=%zu", reason ? reason : "Bound", pipelineState, info.cachedBlobHash ? Hash::FormatHash(info.cachedBlobHash).c_str() : "<none>", (size_t)info.cachedBlobSize);
+		//ShaderInjectorGUI::WriteToRuntimeLog(buffer);
 
 		if (info.cachedBlobHash)
 			MarkShaderReplacementApplyDirty();
@@ -411,6 +418,7 @@ namespace HookD3D12
 			return;
 		}
 
+		//IMPORTANT NOTE: brackets are important here, we need to limit the scope when collecting the root signature
 		{
 			std::lock_guard<std::mutex> lock(gPipelineMutex);
 
@@ -443,6 +451,7 @@ namespace HookD3D12
 
 		ID3D12PipelineState* boundState = initialState;
 
+		//IMPORTANT NOTE: brackets are important here, we need to limit the scope when collecting the root signature
 		{
 			std::lock_guard<std::mutex> lock(gPipelineMutex);
 
@@ -1055,7 +1064,7 @@ namespace HookD3D12
 
 		if (FAILED(hr))
 		{
-			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12->RebuildStreamPSOWithReplacement: failed hr=" + std::to_string((unsigned)hr) + " replacement=" + replacement.name + " streamBytes=" + std::to_string(patchedBlob.size()) + " root=" + PointerToString(rootSignatureOverride) + " vsBytes=" + std::to_string(pipeline.vsBytecode.size()) + " psBytes=" + std::to_string(pipeline.psBytecode.size()) + " inputElements=" + std::to_string(pipeline.inputElements.size()));
+			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12->RebuildStreamPSOWithReplacement: failed hr=" + std::to_string((unsigned)hr) + " replacement=" + replacement.name + " streamBytes=" + std::to_string(patchedBlob.size()) + " root=" + StringHelper::PointerToString(rootSignatureOverride) + " vsBytes=" + std::to_string(pipeline.vsBytecode.size()) + " psBytes=" + std::to_string(pipeline.psBytecode.size()) + " inputElements=" + std::to_string(pipeline.inputElements.size()));
 			pipeline.psoWithReplacement = nullptr;
 			return false;
 		}
@@ -1208,7 +1217,7 @@ namespace HookD3D12
 			{
 				const ShaderReplacement::ShaderReplacementDisk& candidate = gLoadedShaderReplacements[replacementIndex];
 				ShaderInjectorGUI::WriteToRuntimeLog(
-					"Uncaptured PSO size fallback candidate: replacement=" + candidate.name +
+					"HookD3D12->TryApplyUncapturedReplacement: Uncaptured PSO size fallback candidate: replacement=" + candidate.name +
 					" uncapturedHash=" + Hash::FormatHash(uncaptured.cachedBlobHash) +
 					" replacementCacheHash=" + candidate.pipelineCachedBlobHash +
 					" cacheBytes=" + std::to_string((size_t)uncaptured.cachedBlobSize));
@@ -1238,7 +1247,7 @@ namespace HookD3D12
 				}
 
 				ShaderInjectorGUI::WriteToRuntimeLog(
-					"Uncaptured PSO has no replacement match: cachedHash=" + Hash::FormatHash(uncaptured.cachedBlobHash) +
+					"HookD3D12->TryApplyUncapturedReplacement: Uncaptured PSO has no replacement match: cachedHash=" + Hash::FormatHash(uncaptured.cachedBlobHash) +
 					" cachedBytes=" + std::to_string((size_t)uncaptured.cachedBlobSize) +
 					" enabledReplacements=" + std::to_string(enabledCount) +
 					" replacementsWithCachedHash=" + std::to_string(cachedHashCount) +
@@ -1788,9 +1797,9 @@ namespace HookD3D12
 			ShaderInjectorGUI::MainWindowContext guiContext{};
 			guiContext.showWindow = &Globals::gShowShaderInjectorGUI;
 			guiContext.injectorEnabled = Globals::gShaderInjectorEnabled;
-			guiContext.fpsCounterActive = &FPSCounter::gFPSCounterActive;
-			guiContext.fps = FPSCounter::gCurrentFPS;
-			guiContext.frameTimeMs = FPSCounter::gCurrentFrameTimeMS;
+			guiContext.fpsCounterActive = &FPSCounter::gIsFPSCounterActive;
+			guiContext.fps = FPSCounter::gCurrentFramesPerSecond;
+			guiContext.frameTimeMs = FPSCounter::gCurrentFrameTimeMilliseconds;
 			guiContext.runtimeLogText = &ShaderInjectorGUI::runtimeLogText;
 			guiContext.drawMenu = &ShaderInjectorGUI::UI_ShaderInjectorMenu;
 			ShaderInjectorGUI::DrawMainWindow(guiContext);

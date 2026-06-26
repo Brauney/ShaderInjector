@@ -1,23 +1,18 @@
+//HookD3D12PipelineUtils.cpp
 #include "HookD3D12PipelineUtils.h"
-#include "HookD3D12.h"
 
 #include <cstdio>
 #include <sstream>
 #include <dxgi1_6.h>
 
+//custom
 #include "Hash.h"
 #include "ShaderInjectorIO.h"
 #include "ShaderInjectorGUI.h"
+#include "HookD3D12.h"
 
 namespace HookD3D12
 {
-	std::string PointerToString(const void* ptr)
-	{
-		char buffer[32]{};
-		sprintf_s(buffer, "%p", ptr);
-		return buffer;
-	}
-
 	void FillCommonReplacementHashes(ShaderReplacement::ShaderReplacementDisk& replacement, uint64_t vsHash, uint64_t psHash, uint64_t csHash, uint64_t gsHash, uint64_t hsHash, uint64_t dsHash)
 	{
 		replacement.vsHash = vsHash ? Hash::FormatHash(vsHash) : "";

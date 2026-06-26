@@ -1,32 +1,33 @@
-#include "PreCompiledHeader.h"
+//DatabaseStreamPSOs.cpp
+#include <mutex>
+#include <vector>
 
+//custom
 #include "DatabaseStreamPSOs.h"
 #include "HookD3D12PipelineRegistry.h"
 #include "HookD3D12PipelineUtils.h"
-
-#include <mutex>
-#include <vector>
 
 namespace HookD3D12
 {
 	std::vector<PipelineStateInfo> gPipelineStates;
 
-	void CapturePipelineStateStream(const D3D12_PIPELINE_STATE_STREAM_DESC* desc, ID3D12PipelineState* pipelineState)
+	void CapturePipelineStateStream(const D3D12_PIPELINE_STATE_STREAM_DESC* pipelineStreamDescription, ID3D12PipelineState* pipelineState)
 	{
-		if (!desc || !desc->pPipelineStateSubobjectStream || desc->SizeInBytes == 0 || !pipelineState)
+		if (!pipelineStreamDescription || !pipelineStreamDescription->pPipelineStateSubobjectStream || pipelineStreamDescription->SizeInBytes == 0 || !pipelineState)
 			return;
 
-		PipelineStateInfo info{};
-		info.pipelineState = pipelineState;
+		PipelineStateInfo capturedPipeline{};
+		capturedPipeline.pipelineState = pipelineState;
 
-		const uint8_t* streamStart = (const uint8_t*)desc->pPipelineStateSubobjectStream;
-		info.streamBlob.assign(streamStart, streamStart + desc->SizeInBytes);
+		// Keep the raw stream blob; second-run persistence rebuilds need the exact subobject stream captured here.
+		const uint8_t* streamStart = (const uint8_t*)pipelineStreamDescription->pPipelineStateSubobjectStream;
+		capturedPipeline.streamBlob.assign(streamStart, streamStart + pipelineStreamDescription->SizeInBytes);
 
-		ParsePipelineStream(desc, info);
+		ParsePipelineStream(pipelineStreamDescription, capturedPipeline);
 
 		std::lock_guard<std::mutex> lock(gPipelineMutex);
 		RegisterKnownPipelineStateLocked(pipelineState);
-		gPipelineStates.push_back(info);
+		gPipelineStates.push_back(capturedPipeline);
 		RebindPipelineStateInfoPointerFields(gPipelineStates.back());
 		MarkShaderReplacementApplyDirty();
 	}

@@ -1,9 +1,11 @@
+//HookD3D12RootSignature.cpp
 #include "HookD3D12.h"
 
 #include <string>
 #include <unordered_map>
 #include <vector>
 
+//custom
 #include "Hash.h"
 #include "ShaderInjectorGUI.h"
 #include "ShaderInjectorIO.h"

@@ -1,9 +1,13 @@
+//HookD3D12PipelineLibrary.cpp
 #include "HookD3D12.h"
 
 #include <string>
 #include <unordered_set>
 
+//3RD Party
 #include "MinHook.h"
+
+//custom
 #include "ShaderInjectorGUI.h"
 #include "VTableIndex.h"
 
@@ -18,7 +22,7 @@ namespace HookD3D12
 		if (SUCCEEDED(hr) && desc && ppPipelineState && *ppPipelineState)
 		{
 			CaptureGraphicsPipelineState(desc, (ID3D12PipelineState*)*ppPipelineState);
-			ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12PipelineLibrary->Hook_LoadGraphicsPipeline: PipelineLibrary LoadGraphicsPipeline captured cached PSO");
+			//ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12PipelineLibrary->Hook_LoadGraphicsPipeline: PipelineLibrary LoadGraphicsPipeline captured cached PSO");
 		}
 
 		return hr;
@@ -31,7 +35,7 @@ namespace HookD3D12
 		if (SUCCEEDED(hr) && desc && ppPipelineState && *ppPipelineState)
 		{
 			CaptureComputePipelineState(desc, (ID3D12PipelineState*)*ppPipelineState, false);
-			ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12PipelineLibrary->Hook_LoadComputePipeline: PipelineLibrary LoadComputePipeline captured cached PSO");
+			//ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12PipelineLibrary->Hook_LoadComputePipeline: PipelineLibrary LoadComputePipeline captured cached PSO");
 		}
 
 		return hr;
@@ -44,7 +48,7 @@ namespace HookD3D12
 		if (SUCCEEDED(hr) && desc && ppPipelineState && *ppPipelineState)
 		{
 			CapturePipelineStateStream(desc, (ID3D12PipelineState*)*ppPipelineState);
-			ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12PipelineLibrary->Hook_LoadPipeline: PipelineLibrary1 LoadPipeline captured cached stream PSO");
+			//ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12PipelineLibrary->Hook_LoadPipeline: PipelineLibrary1 LoadPipeline captured cached stream PSO");
 		}
 
 		return hr;

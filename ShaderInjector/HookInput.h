@@ -18,16 +18,13 @@
 #include <d3d11.h>
 #include <d3d12.h>
 
-//minhook
+//3RD Party
 #include "MinHook.h"
-
-//imgui
 #include "imgui.h"
 #include "imgui_impl_dx12.h"
 #include "imgui_impl_win32.h"
 
 //custom
-#include "PreCompiledHeader.h" //stupid precompiled header
 #include "Hooks.h"
 #include "Globals.h"
 #include "dsound_proxy.h"
@@ -35,8 +32,8 @@
 
 namespace HookInput
 {
-	extern void Initalize(HWND hWindow);
-	extern void Remove(HWND hWindow);
+	extern void Initalize(HWND windowHandle);
+	extern void Remove(HWND windowHandle);
 
-	static LRESULT APIENTRY WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+	static LRESULT APIENTRY WndProc(HWND windowHandle, UINT message, WPARAM wordParameter, LPARAM longParameter);
 }

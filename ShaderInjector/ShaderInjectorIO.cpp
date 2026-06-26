@@ -1,5 +1,4 @@
-// shaderinjector_io.cpp
-
+	//ShaderInjectorIO.cpp
 #include "ShaderInjectorIO.h"
 
 #include <Windows.h>
@@ -8,7 +7,12 @@
 #include <fstream>
 #include <cstring>
 
+//3RD Party
+#include "inicpp.h"
+
+//custom
 #include "ShaderTemplates.h"
+#include "Globals.h"
 
 namespace ShaderInjectorIO
 {
@@ -16,16 +20,15 @@ namespace ShaderInjectorIO
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| IO HELPERS |||||||||||||||||||||||||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| IO HELPERS |||||||||||||||||||||||||||||||||||||||||||||||||||||
 
-	bool PathExists(const std::string& path)
+	bool PathExists(const std::string& filePath)
 	{
-		DWORD attributes = GetFileAttributesA(path.c_str());
-
+		DWORD attributes = GetFileAttributesA(filePath.c_str());
 		return attributes != INVALID_FILE_ATTRIBUTES;
 	}
 
-	bool FileExists(const std::string& path)
+	bool FileExists(const std::string& filePath)
 	{
-		DWORD attributes = GetFileAttributesA(path.c_str());
+		DWORD attributes = GetFileAttributesA(filePath.c_str());
 
 		if (attributes == INVALID_FILE_ATTRIBUTES)
 			return false;
@@ -33,35 +36,35 @@ namespace ShaderInjectorIO
 		return !(attributes & FILE_ATTRIBUTE_DIRECTORY);
 	}
 
-	void DeleteFileIfExists(const std::string& path)
+	void DeleteFileIfExists(const std::string& filePath)
 	{
-		if (!path.empty() && ShaderInjectorIO::FileExists(path))
-			DeleteFileA(path.c_str());
+		if (!filePath.empty() && ShaderInjectorIO::FileExists(filePath))
+			DeleteFileA(filePath.c_str());
 	}
 
-	bool WriteBinaryFile(const std::string& path, const void* data, size_t size)
+	bool WriteBinaryFile(const std::string& filePath, const void* data, size_t size)
 	{
 		if (!data || size == 0)
 			return false;
 
-		FILE* f = nullptr;
-		fopen_s(&f, path.c_str(), "wb");
+		FILE* fileHandle = nullptr;
+		fopen_s(&fileHandle, filePath.c_str(), "wb");
 
-		if (!f)
+		if (!fileHandle)
 			return false;
 
-		const size_t written = fwrite(data, 1, size, f);
-		fclose(f);
+		const size_t bytesWritten = fwrite(data, 1, size, fileHandle);
+		fclose(fileHandle);
 
-		return written == size;
+		return bytesWritten == size;
 	}
 
-	bool WriteTextFileIfMissing(const std::string& path, const std::string& text)
+	bool WriteTextFileIfMissing(const std::string& filePath, const std::string& text)
 	{
-		if (FileExists(path))
+		if (FileExists(filePath))
 			return true;
 
-		std::ofstream file(path, std::ios::out | std::ios::trunc);
+		std::ofstream file(filePath, std::ios::out | std::ios::trunc);
 
 		if (!file.is_open())
 			return false;
@@ -70,9 +73,9 @@ namespace ShaderInjectorIO
 		return !file.fail();
 	}
 
-	bool DirectoryExists(const std::string& path)
+	bool DirectoryExists(const std::string& directoryPath)
 	{
-		DWORD attributes = GetFileAttributesA(path.c_str());
+		DWORD attributes = GetFileAttributesA(directoryPath.c_str());
 
 		if (attributes == INVALID_FILE_ATTRIBUTES)
 			return false;
@@ -80,9 +83,9 @@ namespace ShaderInjectorIO
 		return (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
 	}
 
-	void DirectoryCreate(const std::string& path)
+	void DirectoryCreate(const std::string& directoryPath)
 	{
-		CreateDirectoryA(path.c_str(), nullptr);
+		CreateDirectoryA(directoryPath.c_str(), nullptr);
 	}
 
 	std::string DirectoryFromPath(const std::string& path)
@@ -105,12 +108,7 @@ namespace ShaderInjectorIO
 		return path.size() >= 2 && ((path[0] == '\\' && path[1] == '\\') || (path[0] == '/' && path[1] == '/'));
 	}
 
-	void CollectFilesByExtension(
-		const std::string& directory,
-		const std::string& extension,
-		std::vector<std::string>& outFiles,
-		bool recursive,
-		bool includeFullPath)
+	void CollectFilesByExtension(const std::string& directory, const std::string& extension,std::vector<std::string>& outFiles, bool recursive, bool includeFullPath)
 	{
 		if (directory.empty() || extension.empty())
 			return;
@@ -221,6 +219,11 @@ namespace ShaderInjectorIO
 		return GetShaderSourcesDirectory() + "\\" + shaderTypeDirectoryName;
 	}
 
+	std::string GetInjectorSettingsPath()
+	{
+		return GetGameDirectory() + "\\" + injectorSettingsName;
+	}
+
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| LOGS |||||||||||||||||||||||||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| LOGS |||||||||||||||||||||||||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| LOGS |||||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -229,41 +232,37 @@ namespace ShaderInjectorIO
 	//clears log file contents
 	void PurgeLogFile()
 	{
-		FILE* f = nullptr;
+		FILE* logFileHandle = nullptr;
 
-		fopen_s(&f, GetLogFilePath().c_str(), "w");
+		fopen_s(&logFileHandle, GetLogFilePath().c_str(), "w");
 
-		if (f)
-			fclose(f);
+		if (logFileHandle)
+			fclose(logFileHandle);
 	}
 
-	//appends text to a log file
-	//NOTE: if there is no log file, one is created
+
 	void WriteToLogFile(const std::string& text)
 	{
-		FILE* f = nullptr;
+		FILE* logFileHandle = nullptr;
 
-		fopen_s(&f, GetLogFilePath().c_str(), "a");
+		//append to file, or write additively (if there isn't one, it will be created automatically)
+		fopen_s(&logFileHandle, GetLogFilePath().c_str(), "a");
 
-		if (!f)
+		if (!logFileHandle)
 			return;
-
-		//write text by itself in log file
-		//fprintf(f, "%s\n", text.c_str());
 
 		SYSTEMTIME systemTime;
 		GetLocalTime(&systemTime);
 
-		//write text with timestamp appended before text.
 		fprintf(
-			f,
-			"[%02d:%02d:%02d] %s\n",
+			logFileHandle,
+			"[%02d:%02d:%02d] %s\n", //write timestamp before each line
 			systemTime.wHour,
 			systemTime.wMinute,
 			systemTime.wSecond,
 			text.c_str());
 
-		fclose(f);
+		fclose(logFileHandle);
 	}
 
 	//quick wrapper, just to knock down our log strings in the code because my eyes hurt
@@ -288,6 +287,7 @@ namespace ShaderInjectorIO
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| TOOLS |||||||||||||||||||||||||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| TOOLS |||||||||||||||||||||||||||||||||||||||||||||||||||||
 
+	//NOTE: make this linux freindly!
 	bool RunProcess(const std::string& commandLine)
 	{
 		STARTUPINFOA startupInformation{};
@@ -295,12 +295,12 @@ namespace ShaderInjectorIO
 
 		startupInformation.cb = sizeof(startupInformation);
 
-		char cmd[4096];
-		strcpy_s(cmd, commandLine.c_str());
+		char commandBuffer[4096];
+		strcpy_s(commandBuffer, commandLine.c_str());
 
-		BOOL ok = CreateProcessA(
+		BOOL processCreated = CreateProcessA(
 			nullptr,
-			cmd,
+			commandBuffer,
 			nullptr,
 			nullptr,
 			FALSE,
@@ -310,7 +310,7 @@ namespace ShaderInjectorIO
 			&startupInformation,
 			&processInformation);
 
-		if (!ok)
+		if (!processCreated)
 			return false;
 
 		WaitForSingleObject(processInformation.hProcess, INFINITE);
@@ -328,11 +328,13 @@ namespace ShaderInjectorIO
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| SHADER |||||||||||||||||||||||||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| SHADER |||||||||||||||||||||||||||||||||||||||||||||||||||||
 
+	//given the file path of a compiled shader bytecode blob, use dxc to disassemble into a somewhat readable dxil text file
+	//NOTE: make this linux freindly!
 	bool GenerateShaderTextDXIL(const std::string shaderBytecodeFilePath)
 	{
 		if (!FileExists(shaderBytecodeFilePath))
 		{
-			WriteToLogFile("[ShaderInjectorIO] GenerateShaderTextDXIL() error! shader bytecode file not found! " + shaderBytecodeFilePath);
+			WriteToLogFileError("ShaderInjectorIO->GenerateShaderTextDXIL: error! shader bytecode file not found! " + shaderBytecodeFilePath);
 			return false;
 		}
 
@@ -340,11 +342,11 @@ namespace ShaderInjectorIO
 
 		if (!FileExists(dxcPath))
 		{
-			WriteToLogFile("[ShaderInjectorIO] GenerateShaderTextDXIL() error! dxc.exe was not found!");
+			WriteToLogFileError("ShaderInjectorIO->GenerateShaderTextDXIL: error! dxc.exe was not found!");
 			return false;
 		}
 
-		std::string txtPath = shaderBytecodeFilePath.substr(0, shaderBytecodeFilePath.size() - 4) + ".dxil.txt";
+		std::string txtPath = shaderBytecodeFilePath.substr(0, shaderBytecodeFilePath.size() - 4) + extensionDXIL;
 		std::string command =
 			"cmd.exe /C \"\"" +
 			dxcPath +
@@ -354,22 +356,23 @@ namespace ShaderInjectorIO
 			txtPath +
 			"\"\"";
 
-		char cmd[4096];
-		strcpy_s(cmd, command.c_str());
+		char commandBuffer[4096];
+		strcpy_s(commandBuffer, command.c_str());
 
-		//NOTE TO SELF: command verification
-		//MessageBoxA(nullptr, cmd, "DXC Command", MB_OK);
+		//quick sanity check to see what the final command looks like
+		//MessageBoxA(nullptr, commandBuffer, "DXC Command", MB_OK);
 
-		RunProcess(cmd);
+		RunProcess(commandBuffer);
 
 		return true;
 	}
 
+	//given raw bytecode from memory, serialize/dump it to the disk in a given directory
 	bool DumpShaderBytecode(const void* bytecode, size_t size, uint64_t hash, const std::string namePrefix, const std::string& directory)
 	{
 		if (!bytecode || size == 0)
 		{
-			WriteToLogFile("[ShaderInjectorIO] DumpShaderBytecode() error! given shader bytecode is null or size is 0!");
+			WriteToLogFileError("ShaderInjectorIO->DumpShaderBytecode: error! given shader bytecode is null or size is 0!");
 			return false;
 		}
 
@@ -377,28 +380,25 @@ namespace ShaderInjectorIO
 		sprintf_s(filename, "%016llX.bin", (unsigned long long)hash);
 		std::string path = directory + "\\" + namePrefix + "_" + filename;
 
-		FILE* f = nullptr;
+		FILE* shaderBytecodeFileHandle = nullptr;
 
-		fopen_s(&f, path.c_str(), "wb");
+		fopen_s(&shaderBytecodeFileHandle, path.c_str(), "wb");
 
-		if (!f)
+		if (!shaderBytecodeFileHandle)
 			return false;
 
-		fwrite(bytecode, 1, size, f);
-		fclose(f);
+		fwrite(bytecode, 1, size, shaderBytecodeFileHandle);
+		fclose(shaderBytecodeFileHandle);
 
 		return GenerateShaderTextDXIL(path);
 	}
 
-	bool CompileSourceToDXILBlob(
-		const std::string& shaderSourceFilePath, //NOTE: this NEEDS to be an .hlsl source shader text file
-		const std::string& shaderProfile, //target profile, for rebirth ps_6_6 is what I found in renderdoc
-		const std::string& entryPoint, //name of the function within the shader to execute
-		std::string& outBlobPath) //output blob file path
+	//given raw HLSL human readable shader source code, compile it into a shader blob
+	bool CompileSourceToDXILBlob(const std::string& shaderSourceFilePath, const std::string& shaderProfile, const std::string& entryPoint, std::string& outBlobPath)
 	{
 		if (!FileExists(shaderSourceFilePath))
 		{
-			WriteToLogFile("[ShaderInjectorIO] CompileSourceToDXILBlob() error! shader source file not found! " + shaderSourceFilePath);
+			WriteToLogFileError("ShaderInjectorIO->CompileSourceToDXILBlob: error! shader source file not found! " + shaderSourceFilePath);
 			return false;
 		}
 
@@ -406,19 +406,18 @@ namespace ShaderInjectorIO
 
 		if (!FileExists(dxcPath))
 		{
-			WriteToLogFile("[ShaderInjectorIO] CompileSourceToDXILBlob() error! dxc.exe was not found!");
+			WriteToLogFileError("ShaderInjectorIO->CompileSourceToDXILBlob: error! dxc.exe was not found!");
 			return false;
 		}
 
 		if (outBlobPath.empty())
 			outBlobPath = shaderSourceFilePath.substr(0, shaderSourceFilePath.find_last_of('.')) + ".blob";
 
-		char cmd[4096];
+		char commandBuffer[4096];
 
-		//cmd.exe /C {dxc.exe path} -T {shader profile} -E {entry point} {shader source path} -Fo {shader output path.blob}
-
+		//call dxc through cmd.exe so quoted game-directory paths are handled consistently.
 		sprintf_s(
-			cmd,
+			commandBuffer,
 			"cmd.exe /C \"\"%s\" -T %s -E %s \"%s\" -Fo \"%s\"\"",
 			dxcPath.c_str(),
 			shaderProfile.c_str(),
@@ -426,48 +425,48 @@ namespace ShaderInjectorIO
 			shaderSourceFilePath.c_str(),
 			outBlobPath.c_str());
 
-		//MessageBoxA(nullptr, cmd, "DXC Compile Command", MB_OK);
+		//quick sanity check to see what the final command looks like
+		//MessageBoxA(nullptr, commandBuffer, "DXC Compile Command", MB_OK);
 
-		return RunProcess(cmd);
+		return RunProcess(commandBuffer);
 	}
 
-	bool LoadDXILBlobFromDisk(
-		const std::string& shaderBlobFilePath, //NOTE: this NEEDS to be a DXIL compiled binary file
-		std::vector<uint8_t>& outBlob) //array to contain the data in memory
+	//given the path of a compiled shader blob, load it into memory
+	bool LoadDXILBlobFromDisk(const std::string& shaderBlobFilePath, std::vector<uint8_t>& outBlob)
 	{
 		if (!FileExists(shaderBlobFilePath))
 		{
-			WriteToLogFile("[ShaderInjectorIO] LoadDXILBlobFromDisk() error! shader blob file not found! " + shaderBlobFilePath);
+			WriteToLogFileError("ShaderInjectorIO->LoadDXILBlobFromDisk: error! shader blob file not found! " + shaderBlobFilePath);
 			return false;
 		}
 
-		//purge blob so we ensure that we are starting clean when we copy the data into it
+		// Clear stale bytes before loading the compiled DXIL blob into memory.
 		outBlob.clear();
 
-		FILE* f = nullptr;
+		FILE* shaderBlobFileHandle = nullptr;
 
-		fopen_s(&f, shaderBlobFilePath.c_str(), "rb");
+		fopen_s(&shaderBlobFileHandle, shaderBlobFilePath.c_str(), "rb");
 
-		if (!f)
+		if (!shaderBlobFileHandle)
 			return false;
 
-		fseek(f, 0, SEEK_END);
+		fseek(shaderBlobFileHandle, 0, SEEK_END);
 
-		long fileSize = ftell(f);
+		long fileSize = ftell(shaderBlobFileHandle);
 
-		fseek(f, 0, SEEK_SET);
+		fseek(shaderBlobFileHandle, 0, SEEK_SET);
 
 		if (fileSize <= 0)
 		{
-			fclose(f);
+			fclose(shaderBlobFileHandle);
 			return false;
 		}
 
 		outBlob.resize((size_t)fileSize);
 
-		fread(outBlob.data(), 1, (size_t)fileSize, f);
+		fread(outBlob.data(), 1, (size_t)fileSize, shaderBlobFileHandle);
 
-		fclose(f);
+		fclose(shaderBlobFileHandle);
 
 		return true;
 	}
@@ -515,7 +514,7 @@ namespace ShaderInjectorIO
 
 		if (!file.is_open())
 		{
-			WriteToLogFile("WriteInternalShaderCodeToDisk: failed to open file: " + shaderSourceFilePath);
+			WriteToLogFileError("ShaderInjectorIO->WriteInternalShaderCodeToDisk: failed to open file: " + shaderSourceFilePath);
 			return false;
 		}
 
@@ -523,7 +522,7 @@ namespace ShaderInjectorIO
 
 		if (file.fail())
 		{
-			WriteToLogFile("WriteInternalShaderCodeToDisk: failed to write file: " + shaderSourceFilePath);
+			WriteToLogFileError("ShaderInjectorIO->WriteInternalShaderCodeToDisk: failed to write file: " + shaderSourceFilePath);
 			return false;
 		}
 
@@ -547,13 +546,82 @@ namespace ShaderInjectorIO
 		return WriteInternalShaderSourceCodeToDisk(GetInternalMarkerComputeShaderSourceCodeFilePath(), ShaderTemplates::internalMarkerComputeShaderSourceCode);
 	}
 
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| INJECTOR SETTINGS |||||||||||||||||||||||||||||||||||||||||||||||||||||
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| INJECTOR SETTINGS |||||||||||||||||||||||||||||||||||||||||||||||||||||
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| INJECTOR SETTINGS |||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+	//returns true for success, false for failure
+	bool ReadInjectorSettings() 
+	{
+		std::string injectorSettingsPath = GetInjectorSettingsPath();
+
+		if (!FileExists(injectorSettingsPath))
+		{
+			WriteToLogFileWarning("ShaderInjectorIO->ReadInjectorSettings: injector settings ini not found! using default settings... ");
+			return false;
+		}
+
+		ini::IniFile injectorSettingsINI;
+		injectorSettingsINI.load(injectorSettingsPath);
+
+		int keyOpenShaderInjectorGUI = injectorSettingsINI["InjectorSettings"]["OpenMenuKey"].as<int>();
+		int keyToggleShaderInjector = injectorSettingsINI["InjectorSettings"]["ToggleInjectorKey"].as<int>();
+		bool gShaderInjectorEnabled = injectorSettingsINI["InjectorSettings"]["InjectorEnabled"].as<bool>();
+		bool gShowShaderInjectorGUI = injectorSettingsINI["InjectorSettings"]["MenuOpen"].as<bool>();
+
+		Globals::keyOpenShaderInjectorGUI = keyOpenShaderInjectorGUI;
+		Globals::keyToggleShaderInjector = keyToggleShaderInjector;
+		Globals::gShaderInjectorEnabled = gShaderInjectorEnabled;
+		Globals::gShowShaderInjectorGUI = gShowShaderInjectorGUI;
+
+		WriteToLogFile("ShaderInjectorIO->ReadInjectorSettings: keyOpenShaderInjectorGUI " + std::to_string(keyOpenShaderInjectorGUI));
+		WriteToLogFile("ShaderInjectorIO->ReadInjectorSettings: keyToggleShaderInjector " + std::to_string(keyToggleShaderInjector));
+		WriteToLogFile("ShaderInjectorIO->ReadInjectorSettings: gShaderInjectorEnabled " + std::to_string(gShaderInjectorEnabled));
+		WriteToLogFile("ShaderInjectorIO->ReadInjectorSettings: gShowShaderInjectorGUI " + std::to_string(gShowShaderInjectorGUI));
+
+		WriteToLogFile("ShaderInjectorIO->ReadInjectorSettings: parsed injector settings");
+
+		return true;
+	}
+
+	void CreateInjectorSettings() 
+	{
+		std::string injectorSettingsPath = GetInjectorSettingsPath();
+
+		if (FileExists(injectorSettingsPath))
+		{
+			WriteToLogFileWarning("ShaderInjectorIO->CreateInjectorSettings: injector settings int already exists!");
+			return;
+		}
+
+		ini::IniFile injectorSettingsINI;
+		injectorSettingsINI["InjectorSettings"]["OpenMenuKey"] = Globals::keyOpenShaderInjectorGUI;
+		injectorSettingsINI["InjectorSettings"]["ToggleInjectorKey"] = Globals::keyToggleShaderInjector;
+		injectorSettingsINI["InjectorSettings"]["InjectorEnabled"] = Globals::gShaderInjectorEnabled;
+		injectorSettingsINI["InjectorSettings"]["MenuOpen"] = Globals::gShowShaderInjectorGUI;
+
+		std::ofstream file(injectorSettingsPath, std::ios::out | std::ios::trunc);
+
+		if (!file.is_open())
+		{
+			WriteToLogFileError("ShaderInjectorIO->CreateInjectorSettings: failed to open injector settings: " + injectorSettingsPath);
+			return;
+		}
+
+		injectorSettingsINI.encode(file);
+
+		file.close();
+
+		WriteToLogFile("ShaderInjectorIO->CreateInjectorSettings: new injector settings created. ");
+	}
+
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| INITALIZE |||||||||||||||||||||||||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| INITALIZE |||||||||||||||||||||||||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| INITALIZE |||||||||||||||||||||||||||||||||||||||||||||||||||||
 
 	bool Initialize()
 	{
-		WriteToLogFile("[ShaderInjectorIO] Initalizing...");
+		WriteToLogFile("ShaderInjectorIO->Initialize: Initalizing...");
 
 		std::string shaderInjectorDirectory = GetShaderInjectorDirectory();
 		std::string logsDirectory = GetLogsDirectory();
@@ -562,6 +630,19 @@ namespace ShaderInjectorIO
 		std::string uncapturedPSODirectory = GetUncapturedPSODirectory();
 		std::string shaderReplacementsDirectory = GetShaderReplacementsDirectory();
 		std::string shaderSourcesDirectory = GetShaderSourcesDirectory();
+		std::string injectorSettingsPath = GetInjectorSettingsPath();
+
+		//========================= INJECTOR SETTINGS =========================
+		//start by reading (or creating) injector settings to configure the injector
+
+		bool injectorSettingsReadResult = ReadInjectorSettings();
+
+		//check if there is existing injetor settings
+		if (!injectorSettingsReadResult)
+		{
+			if(!FileExists(injectorSettingsPath))
+				CreateInjectorSettings();
+		}
 
 		//========================= CREATE DIRECTORY STRUCTURE =========================
 		//if the directory structure or folders do not exist... that will become a problem later...
@@ -570,45 +651,46 @@ namespace ShaderInjectorIO
 		if (!DirectoryExists(shaderInjectorDirectory))
 		{
 			DirectoryCreate(shaderInjectorDirectory);
-			WriteToLogFile("[ShaderInjectorIO] Initalize() | " + shaderInjectorDirectory + " did not exist! Created anyway.");
+			WriteToLogFileWarning("ShaderInjectorIO->Initalize: " + shaderInjectorDirectory + " did not exist! Created anyway.");
 		}
 
 		if (!DirectoryExists(logsDirectory))
 		{
 			DirectoryCreate(logsDirectory);
-			WriteToLogFile("[ShaderInjectorIO] Initalize() | " + logsDirectory + " did not exist! Created anyway.");
+			WriteToLogFile("ShaderInjectorIO->Initalize: " + logsDirectory + " did not exist! Created anyway.");
 		}
 
 		if (!DirectoryExists(toolsDirectory))
 		{
 			DirectoryCreate(toolsDirectory);
-			WriteToLogFile("[ShaderInjectorIO] Initalize() | " + toolsDirectory + " did not exist! Created anyway.");
+			WriteToLogFileWarning("ShaderInjectorIO->Initalize: " + toolsDirectory + " did not exist! Created anyway.");
 		}
 
 		if (!DirectoryExists(dumpDirectory))
 		{
 			DirectoryCreate(dumpDirectory);
-			WriteToLogFile("[ShaderInjectorIO] Initalize() | " + dumpDirectory + " did not exist! Created anyway.");
+			WriteToLogFile("ShaderInjectorIO->Initalize: " + dumpDirectory + " did not exist! Created anyway.");
 		}
 
 		if (!DirectoryExists(uncapturedPSODirectory))
 		{
 			DirectoryCreate(uncapturedPSODirectory);
-			WriteToLogFile("[ShaderInjectorIO] Initalize() | " + uncapturedPSODirectory + " did not exist! Created anyway.");
+			WriteToLogFile("ShaderInjectorIO->Initalize: " + uncapturedPSODirectory + " did not exist! Created anyway.");
 		}
 
 		if (!DirectoryExists(shaderReplacementsDirectory))
 		{
 			DirectoryCreate(shaderReplacementsDirectory);
-			WriteToLogFile("[ShaderInjectorIO] Initalize() | " + shaderReplacementsDirectory + " did not exist! Created anyway.");
+			WriteToLogFile("ShaderInjectorIO->Initalize: " + shaderReplacementsDirectory + " did not exist! Created anyway.");
 		}
 
 		if (!DirectoryExists(shaderSourcesDirectory))
 		{
 			DirectoryCreate(shaderSourcesDirectory);
-			WriteToLogFile("[ShaderInjectorIO] Initalize() | " + shaderSourcesDirectory + " did not exist! Created anyway.");
+			WriteToLogFileWarning("ShaderInjectorIO->Initalize: " + shaderSourcesDirectory + " did not exist! Created anyway.");
 		}
 
+		//create sudirectories within shader injector sources for the different shader types that we can potentially create
 		const char* shaderSourceSubdirectories[] =
 		{
 			"VertexShaders",
@@ -626,7 +708,7 @@ namespace ShaderInjectorIO
 			if (!DirectoryExists(shaderSourceDirectory))
 			{
 				DirectoryCreate(shaderSourceDirectory);
-				WriteToLogFile("[ShaderInjectorIO] Initalize() | " + shaderSourceDirectory + " did not exist! Created anyway.");
+				WriteToLogFileWarning("ShaderInjectorIO->Initalize: " + shaderSourceDirectory + " did not exist! Created anyway.");
 			}
 		}
 

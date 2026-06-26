@@ -1,5 +1,6 @@
 #pragma once
 
+//custom
 #include "ShaderInjectorIO.h"
 #include "ShaderReplacement.h"
 
@@ -34,7 +35,7 @@ float4 main() : SV_Target0
 	static const char* internalGreenPixelShaderSourceCode = R"(
 float4 main() : SV_Target0
 {
-	return float4(0, 1, 0, 1); //red for error
+	return float4(0, 1, 0, 1); //green for success
 }
 )";
 

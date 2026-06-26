@@ -1,5 +1,9 @@
-#include "PreCompiledHeader.h"
+//HookD3D12ReplacementCreation.cpp
+#include <cstdint>
+#include <string>
+#include <vector>
 
+//custom
 #include "HookD3D12.h"
 #include "HookD3D12PipelineUtils.h"
 #include "HookD3D12ReplacementLookup.h"
@@ -8,10 +12,7 @@
 #include "ShaderInjectorGUI.h"
 #include "ShaderInjectorIO.h"
 #include "ShaderReplacement.h"
-
-#include <cstdint>
-#include <string>
-#include <vector>
+#include "StringHelper.h"
 
 namespace HookD3D12
 {
@@ -35,7 +36,7 @@ namespace HookD3D12
 			}
 
 			const std::string hashText = Hash::FormatHash(shaderHash);
-			const std::string shaderTypeText = ShaderReplacement::ShaderTypeToString(shaderType);
+			const std::string shaderTypeText = StringHelper::ShaderTypeToString(shaderType);
 			const std::string replacementName = "ShaderReplacement_" + shaderTypeText + "_" + hashText;
 			const std::string replacementDirectory = ShaderInjectorIO::GetShaderReplacementsDirectory() + "\\" + replacementName;
 
@@ -53,7 +54,7 @@ namespace HookD3D12
 			replacement.enabled = true;
 			replacement.name = replacementName;
 			replacement.shaderType = shaderType;
-			replacement.shaderProfile = ShaderReplacement::ShaderProfileForType(shaderType);
+			replacement.shaderProfile = StringHelper::ShaderProfileForType(shaderType);
 			replacement.shaderEntryPoint = "main";
 			replacement.originalShaderBytecodeHash = hashText;
 			replacement.originalShaderBytecodeLength = std::to_string(shaderBytecodeLength);
@@ -64,7 +65,7 @@ namespace HookD3D12
 			replacement.sourceList = sourceList;
 			replacement.pipelineIndex = std::to_string(pipelineIndex);
 			replacement.pipelineStateType = sourceList == "Stream" ? "PipelineStateStream" : "GraphicsPipelineStateDesc";
-			replacement.psoPointer = PointerToString(pipelineState);
+			replacement.psoPointer = StringHelper::PointerToString(pipelineState);
 
 			uint64_t cachedBlobHash = 0;
 			SIZE_T cachedBlobSize = 0;

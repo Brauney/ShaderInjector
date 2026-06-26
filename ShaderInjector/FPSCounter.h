@@ -2,9 +2,9 @@
 
 namespace FPSCounter
 {
-	extern bool gFPSCounterActive;
-	extern double gCurrentFPS;
-	extern double gCurrentFrameTimeMS;
+	extern bool gIsFPSCounterActive;
+	extern double gCurrentFramesPerSecond;
+	extern double gCurrentFrameTimeMilliseconds;
 
 	void UpdateFPSCounter();
 }

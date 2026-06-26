@@ -1,9 +1,13 @@
+//HookD3D12Install.cpp
 #include "HookD3D12.h"
 
 #include <string>
 #include <unordered_set>
 
+//3RD Party
 #include "MinHook.h"
+
+//custom
 #include "ShaderInjectorGUI.h"
 #include "VTableIndex.h"
 

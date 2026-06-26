@@ -1,9 +1,9 @@
-#include "PreCompiledHeader.h"
+//HookD3D12OverlayStartup.cpp
+#include <d3d12.h>
 
+//custom
 #include "HookD3D12OverlayStartup.h"
 #include "ShaderInjectorGUI.h"
-
-#include <d3d12.h>
 
 namespace HookD3D12
 {

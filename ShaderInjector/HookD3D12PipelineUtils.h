@@ -4,11 +4,11 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-
 #include <d3d12.h>
 #include <dxgi.h>
 #include <dxgi1_4.h>
 
+//custom
 #include "ShaderReplacement.h"
 
 namespace HookD3D12
@@ -50,8 +50,6 @@ namespace HookD3D12
 		sizeof(PSOSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL1,        D3D12_DEPTH_STENCIL_DESC1>),
 		sizeof(PSOSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_VIEW_INSTANCING,       D3D12_VIEW_INSTANCING_DESC>),
 	};
-
-	std::string PointerToString(const void* ptr);
 
 	void FillCommonReplacementHashes(ShaderReplacement::ShaderReplacementDisk& replacement, uint64_t vsHash, uint64_t psHash, uint64_t csHash, uint64_t gsHash, uint64_t hsHash, uint64_t dsHash);
 	void FillCommonReplacementStageLengths(ShaderReplacement::ShaderReplacementDisk& replacement, SIZE_T vsSize, SIZE_T psSize, SIZE_T csSize, SIZE_T gsSize, SIZE_T hsSize, SIZE_T dsSize);

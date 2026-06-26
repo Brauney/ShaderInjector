@@ -1,5 +1,7 @@
+//HookD3D12ReplacementLookup.cpp
 #include "HookD3D12ReplacementLookup.h"
 
+//custom
 #include "Hash.h"
 
 namespace HookD3D12
