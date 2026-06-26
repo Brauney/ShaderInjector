@@ -23,7 +23,7 @@ ToggleInjectorKey=36
 
 ### Virtual Key Codes
 
-To aid in keybinds and make your life easier, here is a table of keybind values. [This is from Microsoft Virtual Keycodes](https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes). The values provided in the offical document are in hexadecimal, [so they need to be converted to a decimal value if you are to write it in to the ini file](https://www.rapidtables.com/convert/number/hex-to-decimal.html). To save you work I've provided you a table already with all of the keycodes converted into decimal values, you're welcome!
+To make your life easier, here is a table of keybind values. [This is from Microsoft Virtual Keycodes](https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes). The values provided in the offical document are in hexadecimal, [so they need to be converted to a decimal value if you are to write it in to the ini file](https://www.rapidtables.com/convert/number/hex-to-decimal.html). To save you work I've provided you a table already with all of the keycodes converted into decimal values, you're welcome!
 
 | Key Name | Decimal Value | Notes |
 | -------- | ------------- | ----- |
