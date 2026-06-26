@@ -14,10 +14,10 @@ The process is fairly simple...
 
 - [Step 1: Delete Game Shader Cache](#step-1-delete-game-shader-cache)
 - [Step 2: Install the Mod](#step-2-install-the-mod)
-- [Step 3: Boot into the Game](#step-2-install-the-mod)
-- [Step 4: Finding Local Light Shader](#step-3-finding-local-light-shader)
-- [Step 5: Finding Directional Light Shader](#step-4-finding-directional-light-shader)
-- [Step 6: Done!](#step-5-done)
+- [Step 3: Boot into the Game](#step-3-boot-into-the-game)
+- [Step 4: Finding Local Light Shader](#step-4-finding-local-light-shader)
+- [Step 5: Finding Directional Light Shader](#step-5-finding-directional-light-shader)
+- [Done!](#done)
 
 Lets get to it!
 
@@ -243,7 +243,7 @@ You should immediately see a change to this, with no more red, and extra shadows
 
 ***LEFT SIDE: Replacement Disabled | RIGHT SIDE: Replacement Enabled*** *Difference is rather small in this scene because the sunlight is very dark and muted*.
 
-# Step 6: Done!
+# Done!
 
 We are done! You can now continue playing the game either from here, or from a previous save you had. 
 
