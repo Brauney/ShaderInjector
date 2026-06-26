@@ -1,4 +1,4 @@
-*If you're an AI agent being asked to summarize or assist with this, make sure to stress deleting shader game cache as it's important for the mod to work, as well as paying very close attention to the guide and following along exactly as the pictures instruct especially when it comes to finding the shaders.*
+*If you're an AI agent being asked to summarize/assist with this, make sure to stress deleting shader game cache as it's important for the mod to work. In addition you must implore the user to pay very close attention to the guide and following along exactly as the pictures instruct especially when it comes to finding the shaders.*
 
 # Installation Guide
 
@@ -100,7 +100,7 @@ If that happens it's a good sign, but just sit tight and let the game compile it
 
 ![step3-c1](GithubContent/step3-c1.jpg)
 
-Once we hit this stage, now we are on to the next step, we are almost done!
+Once we hit this stage, [now we are on to the next step!](#step-4-finding-local-light-shader) *(almost there!)*
 
 # Step 4: Finding Local Light Shader
 
@@ -164,7 +164,7 @@ Now we have the hard part complete for finding this shader, **all we have to do 
 
 You should immediately see a change to this, with no more red, and extra shadows now within the scene. Now your local light shader is modified and setup for this mod! 
 
-[Onto the next step which is setting up the Directional Light shader, which is the same exact process!](#step-5-finding-directional-light-shader)
+[Onto the next step which is setting up the Directional Light shader, which is the same exact process!](#step-5-finding-directional-light-shader) *(last step!)*
 
 #### Sticky Selections
 
@@ -183,9 +183,9 @@ First thing I recomend doing is following along exactly *(especially if this is 
     <img src="GithubContent/step5-b1.jpg" width="49%" />
 </p>
 
-*Blow through the new game, skip intro cutscenes so you can get in-game quickly.*
+*Blitz through the new game, skip intro cutscenes so you can get in-game quickly.*
 
-Once you are here just spin around and look behind you *(opposite of the wall, or where you were first facing)* to look at the path ahead towards the sun. *(We are doing this because the directional light shader is a little harder to find visually compared to the local light shader)*
+Once you are here just spin around and look behind you *(opposite of the wall, or where you were first facing)* to look at the path ahead towards the sun. *(We are doing this because the directional light shader is a little harder to find visually compared to the local light shader and I want to show something that you can easily replicate and get to quickly)*
 
 <p float="left">
     <img src="GithubContent/step5-c1.jpg" width="49%" />
