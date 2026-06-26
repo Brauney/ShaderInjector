@@ -561,25 +561,28 @@ namespace ShaderInjectorIO
 			return false;
 		}
 
-		ini::IniFile injectorSettingsINI;
-		injectorSettingsINI.load(injectorSettingsPath);
+		try
+		{
+			ini::IniFile injectorSettingsINI;
+			injectorSettingsINI.load(injectorSettingsPath);
 
-		int keyOpenShaderInjectorGUI = injectorSettingsINI["InjectorSettings"]["OpenMenuKey"].as<int>();
-		int keyToggleShaderInjector = injectorSettingsINI["InjectorSettings"]["ToggleInjectorKey"].as<int>();
-		bool gShaderInjectorEnabled = injectorSettingsINI["InjectorSettings"]["InjectorEnabled"].as<bool>();
-		bool gShowShaderInjectorGUI = injectorSettingsINI["InjectorSettings"]["MenuOpen"].as<bool>();
+			int keyOpenShaderInjectorGUI = injectorSettingsINI["InjectorSettings"]["OpenMenuKey"].as<int>();
+			int keyToggleShaderInjector = injectorSettingsINI["InjectorSettings"]["ToggleInjectorKey"].as<int>();
+			bool gShaderInjectorEnabled = injectorSettingsINI["InjectorSettings"]["InjectorEnabled"].as<bool>();
+			bool gShowShaderInjectorGUI = injectorSettingsINI["InjectorSettings"]["MenuOpen"].as<bool>();
 
-		Globals::keyOpenShaderInjectorGUI = keyOpenShaderInjectorGUI;
-		Globals::keyToggleShaderInjector = keyToggleShaderInjector;
-		Globals::gShaderInjectorEnabled = gShaderInjectorEnabled;
-		Globals::gShowShaderInjectorGUI = gShowShaderInjectorGUI;
+			Globals::keyOpenShaderInjectorGUI = keyOpenShaderInjectorGUI;
+			Globals::keyToggleShaderInjector = keyToggleShaderInjector;
+			Globals::gShaderInjectorEnabled = gShaderInjectorEnabled;
+			Globals::gShowShaderInjectorGUI = gShowShaderInjectorGUI;
 
-		WriteToLogFile("ShaderInjectorIO->ReadInjectorSettings: keyOpenShaderInjectorGUI " + std::to_string(keyOpenShaderInjectorGUI));
-		WriteToLogFile("ShaderInjectorIO->ReadInjectorSettings: keyToggleShaderInjector " + std::to_string(keyToggleShaderInjector));
-		WriteToLogFile("ShaderInjectorIO->ReadInjectorSettings: gShaderInjectorEnabled " + std::to_string(gShaderInjectorEnabled));
-		WriteToLogFile("ShaderInjectorIO->ReadInjectorSettings: gShowShaderInjectorGUI " + std::to_string(gShowShaderInjectorGUI));
-
-		WriteToLogFile("ShaderInjectorIO->ReadInjectorSettings: parsed injector settings");
+			WriteToLogFile("ShaderInjectorIO->ReadInjectorSettings: parsed injector settings");
+		}
+		catch (...)
+		{
+			WriteToLogFileError("ShaderInjectorIO->ReadInjectorSettings: failed to parse injector settings");
+			return false;
+		}
 
 		return true;
 	}

@@ -8,7 +8,7 @@ Installation of the mod should only take a few minutes at most, but I need to ma
 
 **I cannot stress enough that you must follow the guide down to the letter as close as possible if you want to setup the mod very quickly without frustration (again should take a few minutes at most)**.
 
-It's not a complicated mod to install or setup, but deviating from the guide will surely lead you to problems and confusion especially if you don't know what you are doing. The fortunate thing is once you set it up once, it'll work continously on multiple playthroughs afterwards with no intervention required *(except for only a couple of cases but we will get into that later)*.
+It's not a complicated mod to install or setup, but deviating from the guide will surely lead you to problems and confusion  if you don't know what you are doing. The fortunate thing is once you set it up once, it'll work continously on multiple playthroughs afterwards with no intervention required *(except for only a couple of cases but we will get into that later)*.
 
 With that said this guide should help you every step of the way, the process is simple...
 
