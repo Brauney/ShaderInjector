@@ -4,13 +4,13 @@ Shader Injector Mod for [FF7 Rebirth PC](https://store.steampowered.com/app/2909
 ---
 # Download
 ### [Github](https://github.com/frostbone25/ShaderInjector/releases)
-### Nexus Mods
+### Nexus Mods *(Not Up Yet)*
 
 ---
 # Guides
-## [Installation Guide](https://github.com/frostbone25/ShaderInjector/blob/main/INSTALL.md)
-## [ShaderInjector.ini Settings]()
-
+### [Installation Guide](https://github.com/frostbone25/ShaderInjector/blob/main/INSTALL.md)
+### [ShaderInjector.ini](https://github.com/frostbone25/ShaderInjector/blob/main/InjectorSettings.md)
+### Live Shader Editing *(WIP)*
 ---
 # Screenshots
 
