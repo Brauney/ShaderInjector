@@ -60,8 +60,8 @@ In addition if you would like to do pull requests to improve or contribute featu
 
 People who have aided in the development of this project with testing or other various tasks, big or small.
 
-- Neocortex
+- [Neocortex](https://www.nexusmods.com/profile/Neocoretx)
 - Stephe
-- YIIS
+- [YIIS](https://www.nexusmods.com/profile/YIISx/mods)
 - smackedwookiee
 - sajittarius
