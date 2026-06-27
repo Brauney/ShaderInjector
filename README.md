@@ -16,6 +16,7 @@ Shader Injector Mod for [FF7 Rebirth PC](https://store.steampowered.com/app/2909
 # Showcase
 
 - [Video Preview](https://www.youtube.com/watch?v=ta1WpIeoP1s)
+- [Video Gameplay](https://youtu.be/4dG2Av6-of4)
 - [Video Installation](https://youtu.be/5k9GTPK2eM0)
 
 <p float="left">
