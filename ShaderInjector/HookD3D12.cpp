@@ -1743,8 +1743,10 @@ namespace HookD3D12
 		
 			// Hook CommandQueue and Fence are already captured by minhook
 			gInitialized = true;
+
 			if (!gOverlayInitializedTick)
 				gOverlayInitializedTick = GetTickCount64();
+
 			if (!gLoggedOverlayInitialized)
 			{
 				ShaderInjectorIO::WriteToLogFile("HookD3D12->HandlePresentD3D12: Overlay initialized from present path");
@@ -1777,6 +1779,7 @@ namespace HookD3D12
 				ShaderInjectorIO::WriteToLogFile("HookD3D12->HandlePresentD3D12: delaying startup menu render until overlay is stable");
 				gLoggedStartupMenuDelay = true;
 			}
+
 			return CallOriginalPresent();
 		}
 
