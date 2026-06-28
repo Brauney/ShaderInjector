@@ -703,8 +703,8 @@ FDeferredLightData GetDeferredLight()
 }
 
 //||||||||||||||||||||||||||||||| GBUFFER DECODING |||||||||||||||||||||||||||||||
-//||||||||||||||||||||||||||||||| GBUFFER DECODING  |||||||||||||||||||||||||||||||
-//||||||||||||||||||||||||||||||| GBUFFER DECODING  |||||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||||| GBUFFER DECODING |||||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||||| GBUFFER DECODING |||||||||||||||||||||||||||||||
 
 float DecodeSpecularScalar(float encodedSpecular)
 {
@@ -715,8 +715,6 @@ float DecodeSpecularScalar(float encodedSpecular)
 
 float3 WetnessAndIORAdjustSpecular(float3 specularColor, float selectiveMask)
 {
-    // Labels 0:305-342 and repeated material branches.  The mask is packed in
-    // the high nibble of GBufferE.a; exact UE-side name is not available.
     float wetnessEnabled = (View_WetnessIntensity > 0.0) ? 1.0 : 0.0;
     float fogMediumEnabled = (View_FogContextMediumIOR > 1.0) ? 1.0 : 0.0;
     float wetnessOrFog = saturate(selectiveMask * wetnessEnabled + fogMediumEnabled);
@@ -728,9 +726,7 @@ float3 WetnessAndIORAdjustSpecular(float3 specularColor, float selectiveMask)
 
 float3 MaybeThinFilmSpecular(float3 specularColor, float voH, float customX, float customY)
 {
-    float3 thinFilm = View_ThinFilmTableTexture.SampleLevel(
-        View_SharedBilinearClampedSampler, float2(voH, customX), 0.0).rgb - 0.5;
-
+    float3 thinFilm = View_ThinFilmTableTexture.SampleLevel(View_SharedBilinearClampedSampler, float2(voH, customX), 0.0).rgb - 0.5;
     float thinFilmWeight = saturate(customX * 128.0) * saturate(customY) * 2.50000;
     float oneMinusVoH = 1.0 - voH;
     float fresnelWeight = Pow5(oneMinusVoH);
@@ -852,11 +848,11 @@ FAreaLobe BuildAreaLobe(float3 normal, float3 viewDir, float3 lightDir, float di
 
 FLightingTerms MakeTerms(float3 diffuse, float3 specular, float3 extra)
 {
-    FLightingTerms t;
-    t.Diffuse = diffuse;
-    t.Specular = specular;
-    t.Extra = extra;
-    return t;
+    FLightingTerms terms;
+    terms.Diffuse = diffuse;
+    terms.Specular = specular;
+    terms.Extra = extra;
+    return terms;
 }
 
 //||||||||||||||||||||||||||||||| BRDF |||||||||||||||||||||||||||||||
@@ -1577,7 +1573,7 @@ PSOutput main(PSInput input)
 	//final rendered image making them look dead... why the hell can't we return the whole color?
     float3 diffuseLighting = diffuseLit + extraLit;
     float3 totalLighting = diffuseLighting + specularLit;
-    float diffuseLuminance = dot(diffuseLighting, float3(0.212600, 0.715200, 0.0722000));
+    float diffuseLuminance = dot(diffuseLighting, float3(0.2126, 0.7152, 0.0722));
 
 	//combine final color (rgb) and diffuse luma (a), apply exposure to make sure everything is in range
     output.Color = float4(totalLighting, diffuseLuminance) * View_PreExposure;
