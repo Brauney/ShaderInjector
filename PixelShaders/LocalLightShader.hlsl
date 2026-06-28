@@ -1445,8 +1445,8 @@ FLightingTerms ShadeCloth(FGBufferData gbufferData, FResolvedPixel resolvedPixel
 
     #if defined(ENABLE_MICRO_SHADOWS)
         float unchartedMicroShadow = Uncharted4_MicroShadowing(gbufferData.MaterialAO, lobe.NoL, MICRO_SHADOWS_STRENGTH);
-		float specShadow = unchartedMicroShadow;
-		float diffuseShadow = unchartedMicroShadow;
+		float specShadow = unchartedMicroShadow * resolvedPixel.ShadowedLightAttenuation;
+		float diffuseShadow = unchartedMicroShadow * resolvedPixel.ShadowedLightAttenuation;
     #else
 		float microAO = ComputeMicroShadow(gbufferData.ScreenAO, gbufferData.MaterialAO);
 		float specShadow = SpecularMicroShadow(lobe.NoL, max(1.0e-5, lobe.NoVAbs), gbufferData.Roughness, microAO, resolvedPixel.ShadowedLightAttenuation);
