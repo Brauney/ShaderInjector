@@ -78,6 +78,8 @@ namespace HookD3D12
 	static FrameContext* gFrameContexts = nullptr;
 	static bool          gInitialized = false;
 	static bool          gShutdown = false;
+	static ULONGLONG     gOverlayInitializedTick = 0;
+	static bool          gLoggedStartupMenuDelay = false;
 	static bool          gOverlayRenderingDisabled = false;
 	static bool          gAfterFirstPresent = false;
 	static bool          gLoggedPresentHook = false;
@@ -1741,6 +1743,8 @@ namespace HookD3D12
 		
 			// Hook CommandQueue and Fence are already captured by minhook
 			gInitialized = true;
+			if (!gOverlayInitializedTick)
+				gOverlayInitializedTick = GetTickCount64();
 			if (!gLoggedOverlayInitialized)
 			{
 				ShaderInjectorIO::WriteToLogFile("HookD3D12->HandlePresentD3D12: Overlay initialized from present path");
@@ -1765,6 +1769,16 @@ namespace HookD3D12
 
 		if (!Globals::gShowShaderInjectorGUI || gOverlayRenderingDisabled)
 			return CallOriginalPresent();
+
+		if (gOverlayInitializedTick && GetTickCount64() - gOverlayInitializedTick < 5000)
+		{
+			if (!gLoggedStartupMenuDelay)
+			{
+				ShaderInjectorIO::WriteToLogFile("HookD3D12->HandlePresentD3D12: delaying startup menu render until overlay is stable");
+				gLoggedStartupMenuDelay = true;
+			}
+			return CallOriginalPresent();
+		}
 
 		if (!gShutdown) 
 		{
