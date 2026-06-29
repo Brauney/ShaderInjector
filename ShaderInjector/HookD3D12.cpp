@@ -97,6 +97,8 @@ namespace HookD3D12
 	D3D12PipelineInfo gPipelineInfo;
 
 	static std::unordered_map<ID3D12PipelineState*, ID3D12PipelineState*> gPipelineStateOverrides;
+	static std::vector<ID3D12PipelineState*> gRetiredPipelineStates;
+	static std::unordered_set<ID3D12PipelineState*> gRetiredPipelineStateSet;
 
 	static bool gShaderReplacementApplyDirty = true;
 	static bool gPipelineStateOverridesDirty = true;
@@ -162,14 +164,28 @@ namespace HookD3D12
 			MarkShaderReplacementApplyDirty();
 	}
 
+	void RetirePipelineState(ID3D12PipelineState*& pipelineState)
+	{
+		if (!pipelineState)
+			return;
+
+		UnregisterKnownPipelineStateLocked(pipelineState);
+
+		// Command lists recorded by other game threads may still reference this PSO.
+		// Keep our owning reference alive for the remaining process lifetime rather than risking
+		// an asynchronous device removal after a replacement reload.
+		if (gRetiredPipelineStateSet.insert(pipelineState).second)
+			gRetiredPipelineStates.push_back(pipelineState);
+
+		pipelineState = nullptr;
+	}
+
 	void ReleaseMarkerPSO(ID3D12PipelineState*& pso)
 	{
 		if (!pso)
 			return;
 
-		UnregisterKnownPipelineStateLocked(pso);
-		pso->Release();
-		pso = nullptr;
+		RetirePipelineState(pso);
 	}
 
 	void InvalidateShaderMarkerPSOs()
@@ -194,12 +210,7 @@ namespace HookD3D12
 
 	void ClearReplacementPSO(GraphicsPipelineInfo& pipeline)
 	{
-		if (pipeline.psoWithReplacement)
-		{
-			UnregisterKnownPipelineStateLocked(pipeline.psoWithReplacement);
-			pipeline.psoWithReplacement->Release();
-			pipeline.psoWithReplacement = nullptr;
-		}
+		RetirePipelineState(pipeline.psoWithReplacement);
 
 		pipeline.activeShaderReplacementName.clear();
 		pipeline.activeShaderReplacementType = ShaderReplacement::Unknown;
@@ -209,12 +220,7 @@ namespace HookD3D12
 
 	void ClearReplacementPSO(PipelineStateInfo& pipeline)
 	{
-		if (pipeline.psoWithReplacement)
-		{
-			UnregisterKnownPipelineStateLocked(pipeline.psoWithReplacement);
-			pipeline.psoWithReplacement->Release();
-			pipeline.psoWithReplacement = nullptr;
-		}
+		RetirePipelineState(pipeline.psoWithReplacement);
 
 		pipeline.activeShaderReplacementName.clear();
 		pipeline.activeShaderReplacementType = ShaderReplacement::Unknown;
@@ -247,12 +253,9 @@ namespace HookD3D12
 		for (auto& uncaptured : gUncapturedPipelineStates)
 		{
 			if (uncaptured.replacementPipelineState && trackedReplacementPSOs.find(uncaptured.replacementPipelineState) == trackedReplacementPSOs.end())
-			{
-				UnregisterKnownPipelineStateLocked(uncaptured.replacementPipelineState);
-				uncaptured.replacementPipelineState->Release();
-			}
-
-			uncaptured.replacementPipelineState = nullptr;
+				RetirePipelineState(uncaptured.replacementPipelineState);
+			else
+				uncaptured.replacementPipelineState = nullptr;
 			uncaptured.activeShaderReplacementName.clear();
 			uncaptured.activeShaderReplacementType = ShaderReplacement::Unknown;
 			uncaptured.activeShaderReplacementHash = 0;
@@ -853,13 +856,6 @@ namespace HookD3D12
 				return true;
 		}
 
-		if (pipeline.psoWithReplacement)
-		{
-			UnregisterKnownPipelineStateLocked(pipeline.psoWithReplacement);
-			pipeline.psoWithReplacement->Release();
-			pipeline.psoWithReplacement = nullptr;
-		}
-
 		const void* replacementBytecode = nullptr;
 		size_t replacementBytecodeSize = 0;
 		bool usedFallback = false;
@@ -894,15 +890,20 @@ namespace HookD3D12
 			default: return false;
 		}
 
-		HRESULT hr = Original_CreateGraphicsPipelineState(gDevice, &desc, IID_PPV_ARGS(&pipeline.psoWithReplacement));
+		ID3D12PipelineState* rebuiltPipelineState = nullptr;
+		HRESULT hr = Original_CreateGraphicsPipelineState(gDevice, &desc, IID_PPV_ARGS(&rebuiltPipelineState));
 
-		if (FAILED(hr))
+		if (FAILED(hr) || !rebuiltPipelineState)
 		{
+			if (rebuiltPipelineState)
+				rebuiltPipelineState->Release();
+
 			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12->RebuildGraphicsPSOWithReplacement: failed hr=" + std::to_string((unsigned)hr) + " replacement=" + replacement.name);
-			pipeline.psoWithReplacement = nullptr;
 			return false;
 		}
 
+		RetirePipelineState(pipeline.psoWithReplacement);
+		pipeline.psoWithReplacement = rebuiltPipelineState;
 		pipeline.activeShaderReplacementName = replacement.name;
 		pipeline.activeShaderReplacementType = shaderType;
 		pipeline.activeShaderReplacementHash = shaderHash;
@@ -928,13 +929,6 @@ namespace HookD3D12
 		{
 			if (!pipeline.activeShaderReplacementUsesFallback || (!compiledBlobAvailable && !compiledBlobOnDisk))
 				return true;
-		}
-
-		if (pipeline.psoWithReplacement)
-		{
-			UnregisterKnownPipelineStateLocked(pipeline.psoWithReplacement);
-			pipeline.psoWithReplacement->Release();
-			pipeline.psoWithReplacement = nullptr;
 		}
 
 		const void* replacementBytecode = nullptr;
@@ -1060,17 +1054,22 @@ namespace HookD3D12
 		patchedDesc.pPipelineStateSubobjectStream = patchedBlob.data();
 		patchedDesc.SizeInBytes = patchedBlob.size();
 
-		HRESULT hr = CreatePipelineStateInternal(device2, &patchedDesc, IID_PPV_ARGS(&pipeline.psoWithReplacement));
+		ID3D12PipelineState* rebuiltPipelineState = nullptr;
+		HRESULT hr = CreatePipelineStateInternal(device2, &patchedDesc, IID_PPV_ARGS(&rebuiltPipelineState));
 
 		device2->Release();
 
-		if (FAILED(hr))
+		if (FAILED(hr) || !rebuiltPipelineState)
 		{
+			if (rebuiltPipelineState)
+				rebuiltPipelineState->Release();
+
 			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12->RebuildStreamPSOWithReplacement: failed hr=" + std::to_string((unsigned)hr) + " replacement=" + replacement.name + " streamBytes=" + std::to_string(patchedBlob.size()) + " root=" + StringHelper::PointerToString(rootSignatureOverride) + " vsBytes=" + std::to_string(pipeline.vsBytecode.size()) + " psBytes=" + std::to_string(pipeline.psBytecode.size()) + " inputElements=" + std::to_string(pipeline.inputElements.size()));
-			pipeline.psoWithReplacement = nullptr;
 			return false;
 		}
 
+		RetirePipelineState(pipeline.psoWithReplacement);
+		pipeline.psoWithReplacement = rebuiltPipelineState;
 		pipeline.activeShaderReplacementName = replacement.name;
 		pipeline.activeShaderReplacementType = shaderType;
 		pipeline.activeShaderReplacementHash = shaderHash;

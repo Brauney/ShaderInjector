@@ -123,7 +123,7 @@ namespace HookD3D12
 
 			auto type = *reinterpret_cast<const D3D12_PIPELINE_STATE_SUBOBJECT_TYPE*>(ptr);
 			UINT typeIdx = (UINT)type;
-			if (typeIdx >= ARRAYSIZE(kSubobjectSizes))
+			if (typeIdx >= ARRAYSIZE(kSubobjectSizes) || kSubobjectSizes[typeIdx] == 0)
 				break;
 
 			const size_t subobjectSize = kSubobjectSizes[typeIdx];
@@ -183,7 +183,7 @@ namespace HookD3D12
 
 			auto type = *reinterpret_cast<const D3D12_PIPELINE_STATE_SUBOBJECT_TYPE*>(ptr);
 			UINT typeIdx = (UINT)type;
-			if (typeIdx >= ARRAYSIZE(kSubobjectSizes))
+			if (typeIdx >= ARRAYSIZE(kSubobjectSizes) || kSubobjectSizes[typeIdx] == 0)
 				break;
 
 			const size_t subobjectSize = kSubobjectSizes[typeIdx];
@@ -369,7 +369,7 @@ namespace HookD3D12
 			auto type = *reinterpret_cast<const D3D12_PIPELINE_STATE_SUBOBJECT_TYPE*>(ptr);
 			UINT typeIdx = (UINT)type;
 
-			if (typeIdx >= ARRAYSIZE(kSubobjectSizes))
+			if (typeIdx >= ARRAYSIZE(kSubobjectSizes) || kSubobjectSizes[typeIdx] == 0)
 			{
 				ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12PipelineUtils->ParsePipelineStream: unknown subobject type " + std::to_string(typeIdx) + ", cannot continue");
 				return;
