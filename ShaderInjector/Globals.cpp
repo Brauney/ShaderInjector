@@ -23,7 +23,7 @@ namespace Globals
 	int keyOpenShaderInjectorGUI = VK_INSERT;
 
 	// Key to enable/disable shader injection
-	int keyToggleShaderInjector = VK_HOME;
+	int keyToggleShaderInjector = VK_DELETE;
 
 	bool gShowShaderInjectorGUI = true;
 	bool gShaderInjectorEnabled = true;

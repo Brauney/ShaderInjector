@@ -6,7 +6,7 @@ This document will occasionally be updated with more information collected from 
 - [Lyall FF7RebirthFix](#lyall-ff7rebirthfix)
 - [Reshade](#reshade)
 - [Anti-Virus Shenanigans / False Positives](#anti-virus-shenanigans--false-positives)
-- [Shader Configuration Tweaking](#shader-configuration-tweaking)
+- [Shader Adjustments](#shader-configuration-tweaking)
 - [Vanishing Lights](#vanishing-lights)
 - [Flickering Shadows / Offset Shadows](#flickering-shadows--offset-shadows)
 
@@ -25,7 +25,9 @@ ReShade reportedly is unstable for some users, during testing myself I haven't r
 
 #### Anti-Virus Shenanigans / False Positives
 
-Reportedly for some users anti-virus flags dsound.dll and sometimes other parts of the mod as "severe" threats *(trojan, etc)*. This is a false positive. Unfortunately due to the severity level the Anti-Virus software can delete dsound.dll or some files of ShaderInjector either during installation or when booting the game. This can lead to a cascade of issues during the installation/setup of ShaderInjector. You need to whitelist or disable your Anti-Virus protections as the false actions it takes can create a whole mess of problems. Again, it is a false positive it is not malware, and if you don't trust it the source code is available here on Github and you can inspect the code, or even build the mod yourself.
+Reportedly for some users anti-virus flags dsound.dll and sometimes other parts of the mod as "severe" threats *(trojan, etc)*. **This is a false positive.** Unfortunately due to the severity level the Anti-Virus software can delete dsound.dll or some files of ShaderInjector either during installation or when booting the game. 
+
+This can lead to a cascade of issues during the installation/setup of ShaderInjector *(most common one being that shader injector does not ever appear during the setup process)*. **You need to whitelist or disable your Anti-Virus protections** as the false actions it takes can create a whole mess of problems by deleting many of it's files. **Again, it is a false positive it is not malware**, and if you don't trust it the source code is available here on Github and you can inspect the code, or even build the mod yourself.
 
 ---
 
