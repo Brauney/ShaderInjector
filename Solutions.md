@@ -41,7 +41,9 @@ The shader comes with many default settings i.e. Contact Shadows, Micro Shadows,
 
 I would suggest doing this if you spot artifacts that you may not like brought on either by default settings or different effects *(for example micro shadows is known to introduce overdarkening on some objects)*.
 
-![](GithubContent/Solutions/pre-processor-macros.png)
+<p float="left">
+    <img src="GithubContent/Solutions/pre-processor-macros.png" width="49%" />
+</p>
 
 ***NOTE:*** *When making shader changes don't forget to Rebuild Replacement Shader to apply changes.*
 
