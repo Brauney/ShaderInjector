@@ -203,8 +203,8 @@ namespace HookD3D12
 		pipelineTemplate.sourceList = "Stream";
 		pipelineTemplate.pipelineIndex = std::to_string(pipelineIndex);
 		pipelineTemplate.psoPointer = StringHelper::PointerToString(pipeline.pipelineState);
-		pipelineTemplate.pipelineStreamBlobPath = replacement.replacementDirectory + "\\" + prefix + "_PipelineStateStream" + ShaderInjectorIO::extensionBIN;
-		pipelineTemplate.pipelineStreamMetadataPath = replacement.replacementDirectory + "\\" + prefix + "_PipelineStateStreamMetadata" + ShaderInjectorIO::extensionJSON;
+		pipelineTemplate.pipelineStreamBlobPath = ShaderInjectorIO::JoinPath(replacement.replacementDirectory, std::string(prefix) + "_PipelineStateStream" + ShaderInjectorIO::extensionBIN);
+		pipelineTemplate.pipelineStreamMetadataPath = ShaderInjectorIO::JoinPath(replacement.replacementDirectory, std::string(prefix) + "_PipelineStateStreamMetadata" + ShaderInjectorIO::extensionJSON);
 		FillPipelineTemplateCommonState(pipelineTemplate, pipeline);
 
 		uint64_t cachedBlobHash = 0;
@@ -214,7 +214,7 @@ namespace HookD3D12
 		{
 			pipelineTemplate.pipelineCachedBlobHash = Hash::FormatHash(cachedBlobHash);
 			pipelineTemplate.pipelineCachedBlobLength = std::to_string(cachedBlobSize);
-			pipelineTemplate.pipelineCachedBlobPath = replacement.replacementDirectory + "\\" + prefix + "_OriginalPipelineCachedBlob" + ShaderInjectorIO::extensionBIN;
+			pipelineTemplate.pipelineCachedBlobPath = ShaderInjectorIO::JoinPath(replacement.replacementDirectory, std::string(prefix) + "_OriginalPipelineCachedBlob" + ShaderInjectorIO::extensionBIN);
 		}
 
 		std::vector<uint8_t> rootSignatureBlob;
@@ -223,15 +223,15 @@ namespace HookD3D12
 		{
 			pipelineTemplate.rootSignatureHash = Hash::FormatHash(rootSignatureHash);
 			pipelineTemplate.rootSignatureLength = std::to_string(rootSignatureBlob.size());
-			pipelineTemplate.rootSignatureBlobPath = replacement.replacementDirectory + "\\" + prefix + "_RootSignatureBlob" + ShaderInjectorIO::extensionBIN;
+			pipelineTemplate.rootSignatureBlobPath = ShaderInjectorIO::JoinPath(replacement.replacementDirectory, std::string(prefix) + "_RootSignatureBlob" + ShaderInjectorIO::extensionBIN);
 		}
 
-		if (!pipeline.vsBytecode.empty()) pipelineTemplate.vertexShaderBlobPath = replacement.replacementDirectory + "\\" + prefix + "_OriginalVertexShaderBytecode" + ShaderInjectorIO::extensionBIN;
-		if (!pipeline.psBytecode.empty()) pipelineTemplate.pixelShaderBlobPath = replacement.replacementDirectory + "\\" + prefix + "_OriginalPixelShaderBytecode" + ShaderInjectorIO::extensionBIN;
-		if (!pipeline.csBytecode.empty()) pipelineTemplate.computeShaderBlobPath = replacement.replacementDirectory + "\\" + prefix + "_OriginalComputeShaderBytecode" + ShaderInjectorIO::extensionBIN;
-		if (!pipeline.gsBytecode.empty()) pipelineTemplate.geometryShaderBlobPath = replacement.replacementDirectory + "\\" + prefix + "_OriginalGeometryShaderBytecode" + ShaderInjectorIO::extensionBIN;
-		if (!pipeline.hsBytecode.empty()) pipelineTemplate.hullShaderBlobPath = replacement.replacementDirectory + "\\" + prefix + "_OriginalHullShaderBytecode" + ShaderInjectorIO::extensionBIN;
-		if (!pipeline.dsBytecode.empty()) pipelineTemplate.domainShaderBlobPath = replacement.replacementDirectory + "\\" + prefix + "_OriginalDomainShaderBytecode" + ShaderInjectorIO::extensionBIN;
+		if (!pipeline.vsBytecode.empty()) pipelineTemplate.vertexShaderBlobPath = ShaderInjectorIO::JoinPath(replacement.replacementDirectory, std::string(prefix) + "_OriginalVertexShaderBytecode" + ShaderInjectorIO::extensionBIN);
+		if (!pipeline.psBytecode.empty()) pipelineTemplate.pixelShaderBlobPath = ShaderInjectorIO::JoinPath(replacement.replacementDirectory, std::string(prefix) + "_OriginalPixelShaderBytecode" + ShaderInjectorIO::extensionBIN);
+		if (!pipeline.csBytecode.empty()) pipelineTemplate.computeShaderBlobPath = ShaderInjectorIO::JoinPath(replacement.replacementDirectory, std::string(prefix) + "_OriginalComputeShaderBytecode" + ShaderInjectorIO::extensionBIN);
+		if (!pipeline.gsBytecode.empty()) pipelineTemplate.geometryShaderBlobPath = ShaderInjectorIO::JoinPath(replacement.replacementDirectory, std::string(prefix) + "_OriginalGeometryShaderBytecode" + ShaderInjectorIO::extensionBIN);
+		if (!pipeline.hsBytecode.empty()) pipelineTemplate.hullShaderBlobPath = ShaderInjectorIO::JoinPath(replacement.replacementDirectory, std::string(prefix) + "_OriginalHullShaderBytecode" + ShaderInjectorIO::extensionBIN);
+		if (!pipeline.dsBytecode.empty()) pipelineTemplate.domainShaderBlobPath = ShaderInjectorIO::JoinPath(replacement.replacementDirectory, std::string(prefix) + "_OriginalDomainShaderBytecode" + ShaderInjectorIO::extensionBIN);
 
 		ok = ShaderInjectorIO::WriteBinaryFile(pipelineTemplate.pipelineStreamBlobPath, pipeline.streamBlob.data(), pipeline.streamBlob.size()) && ok;
 		ShaderReplacement::ShaderPipelineStreamMetadataDisk metadata = BuildPipelineStreamMetadata(pipeline);

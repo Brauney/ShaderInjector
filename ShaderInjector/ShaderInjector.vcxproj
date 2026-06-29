@@ -80,6 +80,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;SHADERINJECTOR_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+	  <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
@@ -97,6 +98,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;SHADERINJECTOR_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+	  <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
@@ -114,6 +116,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;SHADERINJECTOR_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+	  <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
@@ -131,6 +134,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;SHADERINJECTOR_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+	  <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>PreCompiledHeader.h</PrecompiledHeaderFile>
       <AdditionalIncludeDirectories>$(ProjectDir)Resources;$(ProjectDir)ExternalDependencies\json\nlohmann;$(ProjectDir)ExternalDependencies\imgui-1.92.8;$(ProjectDir)ExternalDependencies\imgui-1.92.8\backends;$(ProjectDir)ExternalDependencies\MinHook_134\include;$(ProjectDir)ExternalDependencies\inifile-cpp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -172,6 +176,7 @@
     <ClInclude Include="JsonHelper.h" />
     <ClInclude Include="dsound_proxy.h" />
     <ClInclude Include="Keycodes.h" />
+	<ClInclude Include="ProcessRunner.h" />
     <ClInclude Include="ShaderInjectorGUITooltips.h" />
     <ClInclude Include="ShaderInjectorIO.h" />
     <ClInclude Include="ShaderInjectorSettings.h" />
@@ -211,6 +216,7 @@
     <ClCompile Include="HookInput.cpp" />
     <ClCompile Include="dsound_proxy.cpp" />
     <ClCompile Include="Keycodes.cpp" />
+	<ClCompile Include="ProcessRunner.cpp" />
     <ClCompile Include="ShaderInjectorIO.cpp" />
     <ClCompile Include="DatabaseStreamPSOs.cpp" />
     <ClCompile Include="ShaderReplacement.cpp" />

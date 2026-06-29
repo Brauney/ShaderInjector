@@ -24,7 +24,9 @@ namespace DatabaseShaderSources
 		if (shaderSourceName.empty())
 			return "";
 
-		return ShaderInjectorIO::GetShaderSourcesDirectory(ShaderSourceSubdirectoryForType(shaderType)) + "\\" + shaderSourceName;
+		return ShaderInjectorIO::JoinPath(
+			ShaderInjectorIO::GetShaderSourcesDirectory(ShaderSourceSubdirectoryForType(shaderType)),
+			shaderSourceName);
 	}
 
 	void SyncReplacementShaderSourcePath(ShaderReplacement::ShaderReplacementDisk& replacement)

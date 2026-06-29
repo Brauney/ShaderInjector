@@ -329,18 +329,32 @@ namespace Hooks
 
 	void CleanupDummyObjects()
 	{
+		// DXGI swap chains retain presentation state associated with their HWND.
+		// Release every dependent COM object before destroying that window. Native
+		// Windows drivers often tolerate the inverse order, but Wine/VKD3D may not.
+		ShaderInjectorGUI::WriteToRuntimeLog("Hooks->CleanupDummyObjects: releasing command list...");
+		gDummyCommandList.Reset();
+
+		ShaderInjectorGUI::WriteToRuntimeLog("Hooks->CleanupDummyObjects: releasing command allocator...");
+		gDummyCommandAllocator.Reset();
+
+		ShaderInjectorGUI::WriteToRuntimeLog("Hooks->CleanupDummyObjects: releasing swap chain...");
+		gDummySwapChain.Reset();
+
+		ShaderInjectorGUI::WriteToRuntimeLog("Hooks->CleanupDummyObjects: releasing command queue...");
+		gDummyCommandQueue.Reset();
+
+		ShaderInjectorGUI::WriteToRuntimeLog("Hooks->CleanupDummyObjects: releasing device...");
+		gDummyDevice.Reset();
+
 		if (gDummyWindow)
 		{
+			ShaderInjectorGUI::WriteToRuntimeLog("Hooks->CleanupDummyObjects: destroying window...");
 			DestroyWindow(gDummyWindow);
 			gDummyWindow = nullptr;
 		}
 
-		UnregisterClassW(gDummyWindowClassName, GetModuleHandle(nullptr));
-
-		gDummyCommandList.Reset();
-		gDummyCommandAllocator.Reset();
-		gDummySwapChain.Reset();
-		gDummyCommandQueue.Reset();
-		gDummyDevice.Reset();
+		UnregisterClassW(gDummyWindowClassName, GetModuleHandleW(nullptr));
+		ShaderInjectorGUI::WriteToRuntimeLog("Hooks->CleanupDummyObjects: complete.");
 	}
 }

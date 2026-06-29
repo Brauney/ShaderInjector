@@ -131,7 +131,7 @@ namespace HookD3D12
 		{
 			replacement.pipelineCachedBlobHash = Hash::FormatHash(cachedBlobHash);
 			replacement.pipelineCachedBlobLength = std::to_string(cachedBlobSize);
-			replacement.pipelineCachedBlobPath = replacement.replacementDirectory + "\\OriginalPipelineCachedBlob" + ShaderInjectorIO::extensionBIN;
+			replacement.pipelineCachedBlobPath = ShaderInjectorIO::JoinPath(replacement.replacementDirectory, "OriginalPipelineCachedBlob" + ShaderInjectorIO::extensionBIN);
 		}
 	}
 
@@ -394,7 +394,7 @@ namespace HookD3D12
 		{
 			std::string pointerText = StringHelper::PointerToString(pipelineState);
 			std::replace(pointerText.begin(), pointerText.end(), ':', '_');
-			std::string path = ShaderInjectorIO::GetUncapturedPSODirectory() + "\\UncapturedPSO_" + Hash::FormatHash(info.cachedBlobHash) + "_" + pointerText + ShaderInjectorIO::extensionBIN;
+			std::string path = ShaderInjectorIO::JoinPath(ShaderInjectorIO::GetUncapturedPSODirectory(), "UncapturedPSO_" + Hash::FormatHash(info.cachedBlobHash) + "_" + pointerText + ShaderInjectorIO::extensionBIN);
 			ShaderInjectorIO::WriteBinaryFile(path, info.cachedBlob.data(), info.cachedBlob.size());
 		}
 

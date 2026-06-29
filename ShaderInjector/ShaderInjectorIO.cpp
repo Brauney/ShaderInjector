@@ -1,11 +1,22 @@
-	//ShaderInjectorIO.cpp
+//ShaderInjectorIO.cpp
 #include "ShaderInjectorIO.h"
 
-#include <Windows.h>
-#include <io.h>
-#include <vector>
+#include <algorithm>
+#include <chrono>
+#include <cctype>
+#include <cstdio>
+#include <ctime>
+#include <filesystem>
 #include <fstream>
-#include <cstring>
+#include <mutex>
+#include <vector>
+
+#if defined(_WIN32)
+	#include <Windows.h>
+#else
+	#include <limits.h>
+	#include <unistd.h>
+#endif
 
 //3RD Party
 #include "inicpp.h"
@@ -13,33 +24,79 @@
 //custom
 #include "ShaderTemplates.h"
 #include "Globals.h"
+#include "ProcessRunner.h"
 
 namespace ShaderInjectorIO
 {
+	namespace
+	{
+		namespace FileSystem = std::filesystem;
+
+		FileSystem::path PathFromUtf8(const std::string& path)
+		{
+			std::string normalizedPath = path;
+#if !defined(_WIN32)
+			// Accept replacement metadata produced on Windows when inspecting or
+			// migrating it on a Unix-like host.
+			std::replace(normalizedPath.begin(), normalizedPath.end(), '\\', '/');
+#endif
+			return FileSystem::u8path(normalizedPath);
+		}
+
+		std::string PathToUtf8(const FileSystem::path& path)
+		{
+			return path.u8string();
+		}
+
+		std::string Lowercase(std::string text)
+		{
+			std::transform(text.begin(), text.end(), text.begin(), [](unsigned char character)
+			{
+				return static_cast<char>(std::tolower(character));
+			});
+			return text;
+		}
+
+		std::mutex gLogMutex;
+	}
+
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| IO HELPERS |||||||||||||||||||||||||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| IO HELPERS |||||||||||||||||||||||||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| IO HELPERS |||||||||||||||||||||||||||||||||||||||||||||||||||||
 
-	bool PathExists(const std::string& filePath)
+	bool PathExists(const std::string& path)
 	{
-		DWORD attributes = GetFileAttributesA(filePath.c_str());
-		return attributes != INVALID_FILE_ATTRIBUTES;
+		std::error_code error;
+		return !path.empty() && FileSystem::exists(PathFromUtf8(path), error);
 	}
 
 	bool FileExists(const std::string& filePath)
 	{
-		DWORD attributes = GetFileAttributesA(filePath.c_str());
-
-		if (attributes == INVALID_FILE_ATTRIBUTES)
-			return false;
-
-		return !(attributes & FILE_ATTRIBUTE_DIRECTORY);
+		std::error_code error;
+		return !filePath.empty() && FileSystem::is_regular_file(PathFromUtf8(filePath), error);
 	}
 
 	void DeleteFileIfExists(const std::string& filePath)
 	{
-		if (!filePath.empty() && ShaderInjectorIO::FileExists(filePath))
-			DeleteFileA(filePath.c_str());
+		std::error_code error;
+		if (!filePath.empty())
+			FileSystem::remove(PathFromUtf8(filePath), error);
+	}
+
+	bool CopyFileIfMissing(const std::string& sourcePath, const std::string& destinationPath)
+	{
+		if (!FileExists(sourcePath))
+			return false;
+
+		if (FileExists(destinationPath))
+			return true;
+
+		std::error_code error;
+		return FileSystem::copy_file(
+			PathFromUtf8(sourcePath),
+			PathFromUtf8(destinationPath),
+			FileSystem::copy_options::none,
+			error);
 	}
 
 	bool WriteBinaryFile(const std::string& filePath, const void* data, size_t size)
@@ -47,16 +104,12 @@ namespace ShaderInjectorIO
 		if (!data || size == 0)
 			return false;
 
-		FILE* fileHandle = nullptr;
-		fopen_s(&fileHandle, filePath.c_str(), "wb");
-
-		if (!fileHandle)
+		std::ofstream file(PathFromUtf8(filePath), std::ios::binary | std::ios::trunc);
+		if (!file.is_open())
 			return false;
 
-		const size_t bytesWritten = fwrite(data, 1, size, fileHandle);
-		fclose(fileHandle);
-
-		return bytesWritten == size;
+		file.write(static_cast<const char*>(data), static_cast<std::streamsize>(size));
+		return !file.fail();
 	}
 
 	bool WriteTextFileIfMissing(const std::string& filePath, const std::string& text)
@@ -64,7 +117,7 @@ namespace ShaderInjectorIO
 		if (FileExists(filePath))
 			return true;
 
-		std::ofstream file(filePath, std::ios::out | std::ios::trunc);
+		std::ofstream file(PathFromUtf8(filePath), std::ios::out | std::ios::trunc);
 
 		if (!file.is_open())
 			return false;
@@ -75,80 +128,92 @@ namespace ShaderInjectorIO
 
 	bool DirectoryExists(const std::string& directoryPath)
 	{
-		DWORD attributes = GetFileAttributesA(directoryPath.c_str());
-
-		if (attributes == INVALID_FILE_ATTRIBUTES)
-			return false;
-
-		return (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+		std::error_code error;
+		return !directoryPath.empty() && FileSystem::is_directory(PathFromUtf8(directoryPath), error);
 	}
 
 	void DirectoryCreate(const std::string& directoryPath)
 	{
-		CreateDirectoryA(directoryPath.c_str(), nullptr);
+		if (directoryPath.empty())
+			return;
+
+		std::error_code error;
+		FileSystem::create_directories(PathFromUtf8(directoryPath), error);
+	}
+
+	std::string JoinPath(const std::string& directory, const std::string& childPath)
+	{
+		if (directory.empty())
+			return childPath;
+
+		if (childPath.empty())
+			return directory;
+
+		return PathToUtf8(PathFromUtf8(directory) / PathFromUtf8(childPath));
 	}
 
 	std::string DirectoryFromPath(const std::string& path)
 	{
-		const size_t slash = path.find_last_of("\\/");
-		return slash == std::string::npos ? "" : path.substr(0, slash);
+		return PathToUtf8(PathFromUtf8(path).parent_path());
 	}
 
 	std::string FileNameFromPath(const std::string& path)
 	{
-		const size_t slash = path.find_last_of("\\/");
-		return slash == std::string::npos ? path : path.substr(slash + 1);
+		return PathToUtf8(PathFromUtf8(path).filename());
 	}
 
 	bool IsAbsolutePath(const std::string& path)
 	{
-		if (path.size() >= 3 && path[1] == ':' && (path[2] == '\\' || path[2] == '/'))
+		if (path.size() >= 3 && std::isalpha(static_cast<unsigned char>(path[0])) && path[1] == ':' && (path[2] == '\\' || path[2] == '/'))
 			return true;
 
-		return path.size() >= 2 && ((path[0] == '\\' && path[1] == '\\') || (path[0] == '/' && path[1] == '/'));
+		if (path.size() >= 2 && ((path[0] == '\\' && path[1] == '\\') || (path[0] == '/' && path[1] == '/')))
+			return true;
+
+		return !path.empty() && PathFromUtf8(path).is_absolute();
 	}
 
-	void CollectFilesByExtension(const std::string& directory, const std::string& extension,std::vector<std::string>& outFiles, bool recursive, bool includeFullPath)
+	void CollectFilesByExtension(const std::string& directory, const std::string& extension, std::vector<std::string>& outFiles, bool recursive, bool includeFullPath)
 	{
-		if (directory.empty() || extension.empty())
+		if (directory.empty() || extension.empty() || !DirectoryExists(directory))
 			return;
 
-		WIN32_FIND_DATAA findData{};
-		const std::string filePattern = directory + "\\*" + extension;
-		HANDLE findHandle = FindFirstFileA(filePattern.c_str(), &findData);
+		const std::string expectedExtension = Lowercase(extension.front() == '.' ? extension : "." + extension);
+		const FileSystem::directory_options options = FileSystem::directory_options::skip_permission_denied;
+		std::error_code error;
 
-		if (findHandle != INVALID_HANDLE_VALUE)
+		auto collectEntry = [&](const FileSystem::directory_entry& entry)
 		{
-			do
+			if (!entry.is_regular_file(error) || Lowercase(PathToUtf8(entry.path().extension())) != expectedExtension)
+				return;
+
+			outFiles.push_back(PathToUtf8(includeFullPath ? entry.path() : entry.path().filename()));
+		};
+
+		if (recursive)
+		{
+			for (FileSystem::recursive_directory_iterator iterator(PathFromUtf8(directory), options, error), end; iterator != end; iterator.increment(error))
 			{
-				if (!(findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
-					outFiles.push_back(includeFullPath ? directory + "\\" + findData.cFileName : findData.cFileName);
-			} while (FindNextFileA(findHandle, &findData));
-
-			FindClose(findHandle);
+				if (error)
+				{
+					error.clear();
+					continue;
+				}
+				collectEntry(*iterator);
+			}
 		}
-
-		if (!recursive)
-			return;
-
-		const std::string childPattern = directory + "\\*";
-		findHandle = FindFirstFileA(childPattern.c_str(), &findData);
-
-		if (findHandle == INVALID_HANDLE_VALUE)
-			return;
-
-		do
+		else
 		{
-			if (!(findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
-				continue;
-
-			if (strcmp(findData.cFileName, ".") == 0 || strcmp(findData.cFileName, "..") == 0)
-				continue;
-
-			CollectFilesByExtension(directory + "\\" + findData.cFileName, extension, outFiles, true, includeFullPath);
-		} while (FindNextFileA(findHandle, &findData));
-
-		FindClose(findHandle);
+			for (FileSystem::directory_iterator iterator(PathFromUtf8(directory), options, error), end; iterator != end; iterator.increment(error))
+			{
+				if (error)
+				{
+					error.clear();
+					continue;
+				}
+				collectEntry(*iterator);
+			}
+		}
 	}
 
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| DIRECTORIES |||||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -157,71 +222,86 @@ namespace ShaderInjectorIO
 
 	std::string GetGameDirectory()
 	{
-		char path[MAX_PATH] = {};
+#if defined(_WIN32)
+		std::vector<wchar_t> pathBuffer(1024);
+		for (;;)
+		{
+			const DWORD length = GetModuleFileNameW(nullptr, pathBuffer.data(), static_cast<DWORD>(pathBuffer.size()));
+			if (length == 0)
+				return {};
 
-		GetModuleFileNameA(nullptr, path, MAX_PATH);
+			if (length < pathBuffer.size() - 1)
+				return PathToUtf8(FileSystem::path(std::wstring(pathBuffer.data(), length)).parent_path());
 
-		char* lastSlash = strrchr(path, '\\');
+			pathBuffer.resize(pathBuffer.size() * 2);
+		}
+#else
+		std::vector<char> pathBuffer(PATH_MAX + 1, '\0');
+		const ssize_t length = readlink("/proc/self/exe", pathBuffer.data(), PATH_MAX);
+		if (length <= 0)
+			return {};
 
-		if (lastSlash)
-			*lastSlash = '\0';
-
-		return path;
+		return PathToUtf8(FileSystem::path(std::string(pathBuffer.data(), static_cast<size_t>(length))).parent_path());
+#endif
 	}
 
 	std::string GetShaderInjectorDirectory()
 	{
-		return GetGameDirectory() + "\\ShaderInjector";
+		return JoinPath(GetGameDirectory(), "ShaderInjector");
 	}
 
 	std::string GetLogsDirectory()
 	{
-		return GetShaderInjectorDirectory() + "\\Logs";
+		return JoinPath(GetShaderInjectorDirectory(), "Logs");
 	}
 
 	std::string GetLogFilePath()
 	{
-		return GetLogsDirectory() + "\\ShaderInjector" + extensionLOG;
+		return JoinPath(GetLogsDirectory(), "ShaderInjector" + extensionLOG);
 	}
 
 	std::string GetDumpsDirectory()
 	{
-		return GetShaderInjectorDirectory() + "\\Dumps";
+		return JoinPath(GetShaderInjectorDirectory(), "Dumps");
 	}
 
 	std::string GetUncapturedPSODirectory()
 	{
-		return GetShaderInjectorDirectory() + "\\UncapturedPSOs";
+		return JoinPath(GetShaderInjectorDirectory(), "UncapturedPSOs");
 	}
 
 	std::string GetToolsDirectory()
 	{
-		return GetShaderInjectorDirectory() + "\\Tools";
+		return JoinPath(GetShaderInjectorDirectory(), "Tools");
 	}
 
 	std::string GetToolPathDXC()
 	{
-		return GetToolsDirectory() + "\\dxc" + extensionEXE;
+#if defined(_WIN32)
+		return JoinPath(GetToolsDirectory(), "dxc" + extensionEXE);
+#else
+		return JoinPath(GetToolsDirectory(), "dxc");
+#endif
 	}
 
 	std::string GetShaderReplacementsDirectory()
 	{
-		return GetShaderInjectorDirectory() + "\\ShaderReplacements";
+		return JoinPath(GetShaderInjectorDirectory(), "ShaderReplacements");
 	}
 
 	std::string GetShaderSourcesDirectory()
 	{
-		return GetShaderInjectorDirectory() + "\\ShaderSources";
+		return JoinPath(GetShaderInjectorDirectory(), "ShaderSources");
 	}
 
 	std::string GetShaderSourcesDirectory(const std::string& shaderTypeDirectoryName)
 	{
-		return GetShaderSourcesDirectory() + "\\" + shaderTypeDirectoryName;
+		return JoinPath(GetShaderSourcesDirectory(), shaderTypeDirectoryName);
 	}
 
 	std::string GetInjectorSettingsPath()
 	{
-		return GetGameDirectory() + "\\" + injectorSettingsName;
+		return JoinPath(GetGameDirectory(), injectorSettingsName);
 	}
 
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| LOGS |||||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -232,37 +312,29 @@ namespace ShaderInjectorIO
 	//clears log file contents
 	void PurgeLogFile()
 	{
-		FILE* logFileHandle = nullptr;
-
-		fopen_s(&logFileHandle, GetLogFilePath().c_str(), "w");
-
-		if (logFileHandle)
-			fclose(logFileHandle);
+		std::lock_guard<std::mutex> lock(gLogMutex);
+		std::ofstream logFile(PathFromUtf8(GetLogFilePath()), std::ios::trunc);
 	}
 
 
 	void WriteToLogFile(const std::string& text)
 	{
-		FILE* logFileHandle = nullptr;
-
-		//append to file, or write additively (if there isn't one, it will be created automatically)
-		fopen_s(&logFileHandle, GetLogFilePath().c_str(), "a");
-
-		if (!logFileHandle)
+		std::lock_guard<std::mutex> lock(gLogMutex);
+		std::ofstream logFile(PathFromUtf8(GetLogFilePath()), std::ios::app);
+		if (!logFile.is_open())
 			return;
 
-		SYSTEMTIME systemTime;
-		GetLocalTime(&systemTime);
+		const std::time_t currentTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+		std::tm localTime{};
+#if defined(_WIN32)
+		localtime_s(&localTime, &currentTime);
+#else
+		localtime_r(&currentTime, &localTime);
+#endif
 
-		fprintf(
-			logFileHandle,
-			"[%02d:%02d:%02d] %s\n", //write timestamp before each line
-			systemTime.wHour,
-			systemTime.wMinute,
-			systemTime.wSecond,
-			text.c_str());
-
-		fclose(logFileHandle);
+		char timestamp[16]{};
+		std::strftime(timestamp, sizeof(timestamp), "%H:%M:%S", &localTime);
+		logFile << '[' << timestamp << "] " << text << '\n';
 	}
 
 	//quick wrapper, just to knock down our log strings in the code because my eyes hurt
@@ -283,53 +355,11 @@ namespace ShaderInjectorIO
 		WriteToLogFile("[WARNING] " + text);
 	}
 
-	//||||||||||||||||||||||||||||||||||||||||||||||||||||| TOOLS |||||||||||||||||||||||||||||||||||||||||||||||||||||
-	//||||||||||||||||||||||||||||||||||||||||||||||||||||| TOOLS |||||||||||||||||||||||||||||||||||||||||||||||||||||
-	//||||||||||||||||||||||||||||||||||||||||||||||||||||| TOOLS |||||||||||||||||||||||||||||||||||||||||||||||||||||
-
-	//NOTE: make this linux freindly!
-	bool RunProcess(const std::string& commandLine)
-	{
-		STARTUPINFOA startupInformation{};
-		PROCESS_INFORMATION processInformation{};
-
-		startupInformation.cb = sizeof(startupInformation);
-
-		char commandBuffer[4096];
-		strcpy_s(commandBuffer, commandLine.c_str());
-
-		BOOL processCreated = CreateProcessA(
-			nullptr,
-			commandBuffer,
-			nullptr,
-			nullptr,
-			FALSE,
-			CREATE_NO_WINDOW,
-			nullptr,
-			nullptr,
-			&startupInformation,
-			&processInformation);
-
-		if (!processCreated)
-			return false;
-
-		WaitForSingleObject(processInformation.hProcess, INFINITE);
-
-		DWORD exitCode = 0;
-		GetExitCodeProcess(processInformation.hProcess, &exitCode);
-
-		CloseHandle(processInformation.hThread);
-		CloseHandle(processInformation.hProcess);
-
-		return exitCode == 0;
-	}
-
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| SHADER |||||||||||||||||||||||||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| SHADER |||||||||||||||||||||||||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| SHADER |||||||||||||||||||||||||||||||||||||||||||||||||||||
 
 	//given the file path of a compiled shader bytecode blob, use dxc to disassemble into a somewhat readable dxil text file
-	//NOTE: make this linux freindly!
 	bool GenerateShaderTextDXIL(const std::string shaderBytecodeFilePath)
 	{
 		if (!FileExists(shaderBytecodeFilePath))
@@ -338,33 +368,33 @@ namespace ShaderInjectorIO
 			return false;
 		}
 
-		std::string dxcPath = GetToolPathDXC();
+		const std::string dxcPath = GetToolPathDXC();
 
 		if (!FileExists(dxcPath))
 		{
-			WriteToLogFileError("ShaderInjectorIO->GenerateShaderTextDXIL: error! dxc.exe was not found!");
+			WriteToLogFileError("ShaderInjectorIO->GenerateShaderTextDXIL: DXC executable was not found: " + dxcPath);
 			return false;
 		}
 
-		std::string txtPath = shaderBytecodeFilePath.substr(0, shaderBytecodeFilePath.size() - 4) + extensionDXIL;
-		std::string command =
-			"cmd.exe /C \"\"" +
-			dxcPath +
-			"\" -dumpbin \"" +
-			shaderBytecodeFilePath +
-			"\" > \"" +
-			txtPath +
-			"\"\"";
+		FileSystem::path outputPath = PathFromUtf8(shaderBytecodeFilePath);
+		outputPath.replace_extension(extensionDXIL);
+		const std::string dxilTextPath = PathToUtf8(outputPath);
 
-		char commandBuffer[4096];
-		strcpy_s(commandBuffer, command.c_str());
+		const ProcessRunner::ProcessResult processResult = ProcessRunner::Run(
+			dxcPath,
+			{ "-dumpbin", shaderBytecodeFilePath },
+			dxilTextPath);
 
-		//quick sanity check to see what the final command looks like
-		//MessageBoxA(nullptr, commandBuffer, "DXC Command", MB_OK);
+		if (!processResult.Succeeded())
+		{
+			DeleteFileIfExists(dxilTextPath);
+			WriteToLogFileError(
+				"ShaderInjectorIO->GenerateShaderTextDXIL: DXC failed (exit=" +
+				std::to_string(processResult.exitCode) + "): " + processResult.errorMessage);
+			return false;
+		}
 
-		RunProcess(commandBuffer);
-
-		return true;
+		return FileExists(dxilTextPath);
 	}
 
 	//given raw bytecode from memory, serialize/dump it to the disk in a given directory
@@ -378,17 +408,10 @@ namespace ShaderInjectorIO
 
 		char filename[256];
 		sprintf_s(filename, "%016llX.bin", (unsigned long long)hash);
-		std::string path = directory + "\\" + namePrefix + "_" + filename;
+		const std::string path = JoinPath(directory, namePrefix + "_" + filename);
 
-		FILE* shaderBytecodeFileHandle = nullptr;
-
-		fopen_s(&shaderBytecodeFileHandle, path.c_str(), "wb");
-
-		if (!shaderBytecodeFileHandle)
+		if (!WriteBinaryFile(path, bytecode, size))
 			return false;
-
-		fwrite(bytecode, 1, size, shaderBytecodeFileHandle);
-		fclose(shaderBytecodeFileHandle);
 
 		return GenerateShaderTextDXIL(path);
 	}
@@ -402,33 +425,58 @@ namespace ShaderInjectorIO
 			return false;
 		}
 
-		std::string dxcPath = GetToolPathDXC();
+		const std::string dxcPath = GetToolPathDXC();
 
 		if (!FileExists(dxcPath))
 		{
-			WriteToLogFileError("ShaderInjectorIO->CompileSourceToDXILBlob: error! dxc.exe was not found!");
+			WriteToLogFileError("ShaderInjectorIO->CompileSourceToDXILBlob: DXC executable was not found: " + dxcPath);
 			return false;
 		}
 
 		if (outBlobPath.empty())
-			outBlobPath = shaderSourceFilePath.substr(0, shaderSourceFilePath.find_last_of('.')) + ".blob";
+		{
+			FileSystem::path blobPath = PathFromUtf8(shaderSourceFilePath);
+			blobPath.replace_extension(extensionBLOB);
+			outBlobPath = PathToUtf8(blobPath);
+		}
 
-		char commandBuffer[4096];
+		const std::string temporaryBlobPath = outBlobPath + ".compiling";
+		DeleteFileIfExists(temporaryBlobPath);
 
-		//call dxc through cmd.exe so quoted game-directory paths are handled consistently.
-		sprintf_s(
-			commandBuffer,
-			"cmd.exe /C \"\"%s\" -T %s -E %s \"%s\" -Fo \"%s\"\"",
-			dxcPath.c_str(),
-			shaderProfile.c_str(),
-			entryPoint.c_str(),
-			shaderSourceFilePath.c_str(),
-			outBlobPath.c_str());
+		const ProcessRunner::ProcessResult processResult = ProcessRunner::Run(
+			dxcPath,
+			{ "-T", shaderProfile, "-E", entryPoint, shaderSourceFilePath, "-Fo", temporaryBlobPath });
 
-		//quick sanity check to see what the final command looks like
-		//MessageBoxA(nullptr, commandBuffer, "DXC Compile Command", MB_OK);
+		if (!processResult.Succeeded())
+		{
+			DeleteFileIfExists(temporaryBlobPath);
+			WriteToLogFileError(
+				"ShaderInjectorIO->CompileSourceToDXILBlob: DXC failed (exit=" +
+				std::to_string(processResult.exitCode) + "): " + processResult.errorMessage);
+			return false;
+		}
 
-		return RunProcess(commandBuffer);
+		if (!FileExists(temporaryBlobPath))
+		{
+			WriteToLogFileError("ShaderInjectorIO->CompileSourceToDXILBlob: DXC reported success but did not create " + temporaryBlobPath);
+			return false;
+		}
+
+		std::error_code replaceError;
+		FileSystem::copy_file(
+			PathFromUtf8(temporaryBlobPath),
+			PathFromUtf8(outBlobPath),
+			FileSystem::copy_options::overwrite_existing,
+			replaceError);
+		DeleteFileIfExists(temporaryBlobPath);
+
+		if (replaceError)
+		{
+			WriteToLogFileError("ShaderInjectorIO->CompileSourceToDXILBlob: could not replace compiled blob: " + replaceError.message());
+			return false;
+		}
+
+		return FileExists(outBlobPath);
 	}
 
 	//given the path of a compiled shader blob, load it into memory
@@ -443,32 +491,17 @@ namespace ShaderInjectorIO
 		// Clear stale bytes before loading the compiled DXIL blob into memory.
 		outBlob.clear();
 
-		FILE* shaderBlobFileHandle = nullptr;
-
-		fopen_s(&shaderBlobFileHandle, shaderBlobFilePath.c_str(), "rb");
-
-		if (!shaderBlobFileHandle)
+		std::ifstream shaderBlobFile(PathFromUtf8(shaderBlobFilePath), std::ios::binary | std::ios::ate);
+		if (!shaderBlobFile.is_open())
 			return false;
 
-		fseek(shaderBlobFileHandle, 0, SEEK_END);
-
-		long fileSize = ftell(shaderBlobFileHandle);
-
-		fseek(shaderBlobFileHandle, 0, SEEK_SET);
-
+		const std::streamsize fileSize = shaderBlobFile.tellg();
 		if (fileSize <= 0)
-		{
-			fclose(shaderBlobFileHandle);
 			return false;
-		}
 
-		outBlob.resize((size_t)fileSize);
-
-		fread(outBlob.data(), 1, (size_t)fileSize, shaderBlobFileHandle);
-
-		fclose(shaderBlobFileHandle);
-
-		return true;
+		outBlob.resize(static_cast<size_t>(fileSize));
+		shaderBlobFile.seekg(0, std::ios::beg);
+		return static_cast<bool>(shaderBlobFile.read(reinterpret_cast<char*>(outBlob.data()), fileSize));
 	}
 
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| SHADER INTERNAL RESOURCES |||||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -477,32 +510,32 @@ namespace ShaderInjectorIO
 
 	std::string GetInternalMarkerPixelShaderSourceCodeFilePath() 
 	{
-		return GetShaderInjectorDirectory() + "\\" + internalMarkerPixelShaderName + extensionHLSL;
+		return JoinPath(GetShaderInjectorDirectory(), internalMarkerPixelShaderName + extensionHLSL);
 	}
 
 	std::string GetInternalMarkerPixelShaderBlobFilePath()
 	{
-		return GetShaderInjectorDirectory() + "\\" + internalMarkerPixelShaderName + extensionBLOB;
+		return JoinPath(GetShaderInjectorDirectory(), internalMarkerPixelShaderName + extensionBLOB);
 	}
 
 	std::string GetInternalNullPixelShaderSourceCodeFilePath()
 	{
-		return GetShaderInjectorDirectory() + "\\" + internalNullPixelShaderName + extensionHLSL;
+		return JoinPath(GetShaderInjectorDirectory(), internalNullPixelShaderName + extensionHLSL);
 	}
 
 	std::string GetInternalNullPixelShaderBlobFilePath()
 	{
-		return GetShaderInjectorDirectory() + "\\" + internalNullPixelShaderName + extensionBLOB;
+		return JoinPath(GetShaderInjectorDirectory(), internalNullPixelShaderName + extensionBLOB);
 	}
 
 	std::string GetInternalMarkerComputeShaderSourceCodeFilePath()
 	{
-		return GetShaderInjectorDirectory() + "\\" + internalMarkerComputeShaderName + extensionHLSL;
+		return JoinPath(GetShaderInjectorDirectory(), internalMarkerComputeShaderName + extensionHLSL);
 	}
 
 	std::string GetInternalMarkerComputeShaderBlobFilePath()
 	{
-		return GetShaderInjectorDirectory() + "\\" + internalMarkerComputeShaderName + extensionBLOB;
+		return JoinPath(GetShaderInjectorDirectory(), internalMarkerComputeShaderName + extensionBLOB);
 	}
 
 	bool WriteInternalShaderSourceCodeToDisk(std::string shaderSourceFilePath, const char* shaderSourceCode)
@@ -510,7 +543,7 @@ namespace ShaderInjectorIO
 		//NOTE: we open with trunc so we overwrite what was originally there in the file
 		//for "internal" shaders used by the shader injector, want to make sure that we are starting clean and fresh
 		//as it's very possible that it got tampered with
-		std::ofstream file(shaderSourceFilePath, std::ios::out | std::ios::trunc);
+		std::ofstream file(PathFromUtf8(shaderSourceFilePath), std::ios::out | std::ios::trunc);
 
 		if (!file.is_open())
 		{
@@ -603,7 +636,7 @@ namespace ShaderInjectorIO
 		injectorSettingsINI["InjectorSettings"]["InjectorEnabled"] = Globals::gShaderInjectorEnabled;
 		injectorSettingsINI["InjectorSettings"]["MenuOpen"] = Globals::gShowShaderInjectorGUI;
 
-		std::ofstream file(injectorSettingsPath, std::ios::out | std::ios::trunc);
+		std::ofstream file(PathFromUtf8(injectorSettingsPath), std::ios::out | std::ios::trunc);
 
 		if (!file.is_open())
 		{

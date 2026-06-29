@@ -1,7 +1,6 @@
 //ShaderReplacement.cpp
 #include "ShaderReplacement.h"
 
-#include <windows.h>
 #include <fstream>
 #include <vector>
 
@@ -22,7 +21,7 @@ namespace ShaderReplacement
 		if (filePath.empty() || replacementDirectory.empty())
 			return;
 
-		filePath = replacementDirectory + "\\" + ShaderInjectorIO::FileNameFromPath(filePath);
+		filePath = ShaderInjectorIO::JoinPath(replacementDirectory, ShaderInjectorIO::FileNameFromPath(filePath));
 	}
 
 	std::string ShaderSourceSubdirectoryForType(ShaderReplacement::ShaderType shaderType)
@@ -93,7 +92,7 @@ namespace ShaderReplacement
 
 		const std::string legacySourcePath = replacement.shaderSourcePath.empty()
 			? ""
-			: replacementDirectory + "\\" + ShaderInjectorIO::FileNameFromPath(replacement.shaderSourcePath);
+			: ShaderInjectorIO::JoinPath(replacementDirectory, ShaderInjectorIO::FileNameFromPath(replacement.shaderSourcePath));
 
 		if (replacement.shaderSourceName.empty() && !replacement.shaderSourcePath.empty())
 			replacement.shaderSourceName = ShaderInjectorIO::FileNameFromPath(replacement.shaderSourcePath);
@@ -103,16 +102,13 @@ namespace ShaderReplacement
 			// Shader source files now live under the centralized ShaderSources tree.
 			// This migration keeps older per-replacement source files usable.
 			const std::string centralSourceDirectory = ShaderInjectorIO::GetShaderSourcesDirectory(ShaderSourceSubdirectoryForType(replacement.shaderType));
-			const std::string centralSourcePath =
-				centralSourceDirectory +
-				"\\" +
-				replacement.shaderSourceName;
+			const std::string centralSourcePath = ShaderInjectorIO::JoinPath(centralSourceDirectory, replacement.shaderSourceName);
 
 			ShaderInjectorIO::DirectoryCreate(ShaderInjectorIO::GetShaderSourcesDirectory());
 			ShaderInjectorIO::DirectoryCreate(centralSourceDirectory);
 
-			if (!legacySourcePath.empty() && !ShaderInjectorIO::FileExists(centralSourcePath) && ShaderInjectorIO::FileExists(legacySourcePath))
-				CopyFileA(legacySourcePath.c_str(), centralSourcePath.c_str(), TRUE);
+			if (!legacySourcePath.empty() && !ShaderInjectorIO::FileExists(centralSourcePath))
+				ShaderInjectorIO::CopyFileIfMissing(legacySourcePath, centralSourcePath);
 
 			replacement.shaderSourcePath = centralSourcePath;
 		}

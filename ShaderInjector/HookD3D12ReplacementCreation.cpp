@@ -38,7 +38,7 @@ namespace HookD3D12
 			const std::string hashText = Hash::FormatHash(shaderHash);
 			const std::string shaderTypeText = StringHelper::ShaderTypeToString(shaderType);
 			const std::string replacementName = "ShaderReplacement_" + shaderTypeText + "_" + hashText;
-			const std::string replacementDirectory = ShaderInjectorIO::GetShaderReplacementsDirectory() + "\\" + replacementName;
+			const std::string replacementDirectory = ShaderInjectorIO::JoinPath(ShaderInjectorIO::GetShaderReplacementsDirectory(), replacementName);
 
 			if (!ShaderInjectorIO::DirectoryExists(replacementDirectory))
 				ShaderInjectorIO::DirectoryCreate(replacementDirectory);
@@ -59,9 +59,9 @@ namespace HookD3D12
 			replacement.originalShaderBytecodeHash = hashText;
 			replacement.originalShaderBytecodeLength = std::to_string(shaderBytecodeLength);
 			replacement.replacementDirectory = replacementDirectory;
-			replacement.originalShaderBlobPath = replacementDirectory + "\\OriginalShaderBytecode" + ShaderInjectorIO::extensionBIN;
-			replacement.modifiedShaderBlobPath = replacementDirectory + "\\NewCompiledBlob" + ShaderInjectorIO::extensionBLOB;
-			replacement.jsonPath = replacementDirectory + "\\ShaderReplacement" + ShaderInjectorIO::extensionJSON;
+			replacement.originalShaderBlobPath = ShaderInjectorIO::JoinPath(replacementDirectory, "OriginalShaderBytecode" + ShaderInjectorIO::extensionBIN);
+			replacement.modifiedShaderBlobPath = ShaderInjectorIO::JoinPath(replacementDirectory, "NewCompiledBlob" + ShaderInjectorIO::extensionBLOB);
+			replacement.jsonPath = ShaderInjectorIO::JoinPath(replacementDirectory, "ShaderReplacement" + ShaderInjectorIO::extensionJSON);
 			replacement.sourceList = sourceList;
 			replacement.pipelineIndex = std::to_string(pipelineIndex);
 			replacement.pipelineStateType = sourceList == "Stream" ? "PipelineStateStream" : "GraphicsPipelineStateDesc";
@@ -75,7 +75,7 @@ namespace HookD3D12
 			{
 				replacement.pipelineCachedBlobHash = Hash::FormatHash(cachedBlobHash);
 				replacement.pipelineCachedBlobLength = std::to_string(cachedBlobSize);
-				replacement.pipelineCachedBlobPath = replacement.replacementDirectory + "\\OriginalPipelineCachedBlob" + ShaderInjectorIO::extensionBIN;
+				replacement.pipelineCachedBlobPath = ShaderInjectorIO::JoinPath(replacement.replacementDirectory, "OriginalPipelineCachedBlob" + ShaderInjectorIO::extensionBIN);
 			}
 
 			replacement.targetSubobjectType = std::to_string((UINT)SubobjectTypeForShaderType(shaderType));
@@ -101,10 +101,10 @@ namespace HookD3D12
 				FillStreamReplacementPortableStateFromBlob(replacement, *streamInfo);
 
 				if (!streamInfo->streamBlob.empty())
-					replacement.pipelineStreamBlobPath = replacementDirectory + "\\PipelineStateStream" + ShaderInjectorIO::extensionBIN;
+					replacement.pipelineStreamBlobPath = ShaderInjectorIO::JoinPath(replacementDirectory, "PipelineStateStream" + ShaderInjectorIO::extensionBIN);
 
 				if (!streamInfo->streamBlob.empty())
-					replacement.pipelineStreamMetadataPath = replacementDirectory + "\\PipelineStateStreamMetadata" + ShaderInjectorIO::extensionJSON;
+					replacement.pipelineStreamMetadataPath = ShaderInjectorIO::JoinPath(replacementDirectory, "PipelineStateStreamMetadata" + ShaderInjectorIO::extensionJSON);
 
 				std::vector<uint8_t> rootSignatureBlob;
 				uint64_t rootSignatureHash = 0;
@@ -113,26 +113,26 @@ namespace HookD3D12
 				{
 					replacement.rootSignatureHash = Hash::FormatHash(rootSignatureHash);
 					replacement.rootSignatureLength = std::to_string(rootSignatureBlob.size());
-					replacement.rootSignatureBlobPath = replacementDirectory + "\\RootSignatureBlob" + ShaderInjectorIO::extensionBIN;
+					replacement.rootSignatureBlobPath = ShaderInjectorIO::JoinPath(replacementDirectory, "RootSignatureBlob" + ShaderInjectorIO::extensionBIN);
 				}
 
 				if (!streamInfo->vsBytecode.empty())
-					replacement.vertexShaderBlobPath = replacementDirectory + "\\OriginalVertexShaderBytecode" + ShaderInjectorIO::extensionBIN;
+					replacement.vertexShaderBlobPath = ShaderInjectorIO::JoinPath(replacementDirectory, "OriginalVertexShaderBytecode" + ShaderInjectorIO::extensionBIN);
 
 				if (!streamInfo->psBytecode.empty())
-					replacement.pixelShaderBlobPath = replacementDirectory + "\\OriginalPixelShaderBytecode" + ShaderInjectorIO::extensionBIN;
+					replacement.pixelShaderBlobPath = ShaderInjectorIO::JoinPath(replacementDirectory, "OriginalPixelShaderBytecode" + ShaderInjectorIO::extensionBIN);
 
 				if (!streamInfo->csBytecode.empty())
-					replacement.computeShaderBlobPath = replacementDirectory + "\\OriginalComputeShaderBytecode" + ShaderInjectorIO::extensionBIN;
+					replacement.computeShaderBlobPath = ShaderInjectorIO::JoinPath(replacementDirectory, "OriginalComputeShaderBytecode" + ShaderInjectorIO::extensionBIN);
 
 				if (!streamInfo->gsBytecode.empty())
-					replacement.geometryShaderBlobPath = replacementDirectory + "\\OriginalGeometryShaderBytecode" + ShaderInjectorIO::extensionBIN;
+					replacement.geometryShaderBlobPath = ShaderInjectorIO::JoinPath(replacementDirectory, "OriginalGeometryShaderBytecode" + ShaderInjectorIO::extensionBIN);
 
 				if (!streamInfo->hsBytecode.empty())
-					replacement.hullShaderBlobPath = replacementDirectory + "\\OriginalHullShaderBytecode" + ShaderInjectorIO::extensionBIN;
+					replacement.hullShaderBlobPath = ShaderInjectorIO::JoinPath(replacementDirectory, "OriginalHullShaderBytecode" + ShaderInjectorIO::extensionBIN);
 
 				if (!streamInfo->dsBytecode.empty())
-					replacement.domainShaderBlobPath = replacementDirectory + "\\OriginalDomainShaderBytecode" + ShaderInjectorIO::extensionBIN;
+					replacement.domainShaderBlobPath = ShaderInjectorIO::JoinPath(replacementDirectory, "OriginalDomainShaderBytecode" + ShaderInjectorIO::extensionBIN);
 			}
 
 			bool ok = true;

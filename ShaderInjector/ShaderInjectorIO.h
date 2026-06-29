@@ -21,10 +21,12 @@ namespace ShaderInjectorIO
 	bool PathExists(const std::string& path);
 	bool FileExists(const std::string& path);
 	void DeleteFileIfExists(const std::string& path);
+	bool CopyFileIfMissing(const std::string& sourcePath, const std::string& destinationPath);
 	bool WriteBinaryFile(const std::string& path, const void* data, size_t size);
 	bool WriteTextFileIfMissing(const std::string& path, const std::string& text);
 	bool DirectoryExists(const std::string& path);
 	void DirectoryCreate(const std::string& path);
+	std::string JoinPath(const std::string& directory, const std::string& childPath);
 	std::string DirectoryFromPath(const std::string& path);
 	std::string FileNameFromPath(const std::string& path);
 	bool IsAbsolutePath(const std::string& path);
@@ -50,9 +52,6 @@ namespace ShaderInjectorIO
 	void WriteToLogFileError(const std::string& text);
 	void WriteToLogFileSuccess(const std::string& text);
 	void WriteToLogFileWarning(const std::string& text);
-
-	//tools
-	bool RunProcess(const std::string& commandLine);
 
 	//shader
 	bool GenerateShaderTextDXIL(const std::string shaderBytecodeFilePath);

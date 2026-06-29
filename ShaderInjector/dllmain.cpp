@@ -143,6 +143,7 @@ static DWORD WINAPI OnAttachDLL(LPVOID)
 	HookD3D12::InstallD3D12CreateDeviceHook(d3d12);
 
 	Hooks::Initialize();
+	ShaderInjectorIO::WriteToLogFile("dllmain->OnAttachDLL: hook initialization complete.");
 
 	return 0;
 }
