@@ -87,3 +87,35 @@ The other way to fix the issue is to disable Dynamic Resolution entirely setting
 ![](GithubContent/Solutions/dynamic-res-100.png)
 
 Now if you need the performance boost you can instead edit Engine.ini or use [FFVII Hook](https://www.nexusmods.com/finalfantasy7rebirth/mods/4) to natively render at a lower resolution instead using something like ```r.SetRes 1920x1080f```
+
+---
+
+#### Linux Support
+
+Courtesy of [smackedwookiee](url=https://www.youtube.com/@SmackedWookiee)!
+
+1) Install directx-shader-compiler
+    For Ubuntu:
+        sudo apt update
+        sudo apt install directx-shader-compiler
+    For Arch-based distros:
+        sudo pacman -S directx-shader-compiler
+    For Fedora
+        sudo dnf install directx-shader-compiler
+2) Clear the shader cache
+    For Steam Users:
+        Click on the Settings gear
+        Manage > Browse Local Files
+        Go up two levels to steamapps
+        Navigate to the following path: /compatdata/2909400/pfx/drive_c/users/steamuser/My Documents/My Games/FINAL FANTASY VII REBIRTH/Saved/
+        Delete the .ushaderprecache files
+    For HGL Users (not tested)
+        Click on the game to open the game profile
+        Click on the path next to WinePrefix folder
+        Navigate to the following path: /drive_c/users/%linuxusername%/My Documents/My Games/FINAL FANTASY VII REBRITH/Saved/
+        Delete the .ushaderprecache files
+3) Add the following launch options for Steam: WINEDLLOVERRIDES="dsound=n,b"
+or for HGL users (not tested)
+Add the following Variable name to the game settings page:
+Variable name: WINEDLLOVERRIDES
+Value: dsound=n,b

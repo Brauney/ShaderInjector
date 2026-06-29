@@ -68,7 +68,7 @@ People who have aided in the development of this project with testing or other v
 - [Neocortex](https://www.nexusmods.com/profile/Neocoretx)
 - Stephe
 - [YIIS](https://www.nexusmods.com/profile/YIISx/mods)
-- smackedwookiee
+- [smackedwookiee](url=https://www.youtube.com/@SmackedWookiee)
 - sajittarius
 - [Zaccachino](https://www.nexusmods.com/profile/Zaccachino)
 - [Ninjagrime](https://www.nexusmods.com/profile/Ninjagrime)
