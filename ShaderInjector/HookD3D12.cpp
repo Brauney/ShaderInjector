@@ -1756,18 +1756,6 @@ namespace HookD3D12
 
 		InstallCommandListHooks();
 
-		if (GetAsyncKeyState(Globals::keyOpenShaderInjectorGUI) & 1)
-		{
-			Globals::gShowShaderInjectorGUI = !Globals::gShowShaderInjectorGUI;
-			//ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12->HandlePresentD3D12: Shader Injector GUI " + (gShowShaderInjectorGUI ? "Enabled" : "Disabled"));
-		}
-
-		if (GetAsyncKeyState(Globals::keyToggleShaderInjector) & 1)
-		{
-			Globals::gShaderInjectorEnabled = !Globals::gShaderInjectorEnabled;
-			MarkShaderReplacementApplyDirty();
-			//ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12->HandlePresentD3D12: Shader Injector " + (gShaderInjectorEnabled ? "Enabled" : "Disabled"));
-		}
 
 		if (!Globals::gShowShaderInjectorGUI || gOverlayRenderingDisabled)
 			return CallOriginalPresent();

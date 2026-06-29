@@ -77,6 +77,25 @@ namespace HookInput
 		auto originalWindowProcedureIterator = sOriginalWindowProcedures.find(windowHandle);
 		WNDPROC originalWindowProcedure = (originalWindowProcedureIterator != sOriginalWindowProcedures.end()) ? originalWindowProcedureIterator->second : nullptr;
 
+		const bool isFreshKeyDown = (message == WM_KEYDOWN || message == WM_SYSKEYDOWN) && (longParameter & 0x40000000) == 0;
+		if (isFreshKeyDown)
+		{
+			const int key = static_cast<int>(wordParameter);
+
+			if (key == Globals::keyOpenShaderInjectorGUI)
+			{
+				Globals::gShowShaderInjectorGUI = !Globals::gShowShaderInjectorGUI;
+				return TRUE;
+			}
+
+			if (key == Globals::keyToggleShaderInjector)
+			{
+				Globals::gShaderInjectorEnabled = !Globals::gShaderInjectorEnabled;
+				HookD3D12::MarkShaderReplacementApplyDirty();
+				return TRUE;
+			}
+		}
+
 		if (Globals::gShowShaderInjectorGUI && HookD3D12::IsInitialized() && ImGui::GetCurrentContext())
 		{
 			if (ImGui_ImplWin32_WndProcHandler(windowHandle, message, wordParameter, longParameter))
