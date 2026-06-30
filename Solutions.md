@@ -9,6 +9,7 @@ This document will occasionally be updated with more information collected from 
 - [Shader Adjustments](#shader-configuration-tweaking)
 - [Vanishing Lights](#vanishing-lights)
 - [Flickering Shadows / Offset Shadows](#flickering-shadows--offset-shadows)
+- [Linux Support](#linux-support)
 
 ---
 
