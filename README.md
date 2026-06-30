@@ -72,3 +72,4 @@ People who have aided in the development of this project with testing or other v
 - sajittarius
 - [Zaccachino](https://www.nexusmods.com/profile/Zaccachino)
 - [Ninjagrime](https://www.nexusmods.com/profile/Ninjagrime)
+- [Phroster](https://www.nexusmods.com/profile/Phroster)
