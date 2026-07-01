@@ -1,0 +1,36 @@
+#include <windows.h>
+#include "ShaderInjectorVersion.h"
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION SHADER_INJECTOR_VERSION_NUMERIC
+ PRODUCTVERSION SHADER_INJECTOR_VERSION_NUMERIC
+ FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+#ifdef _DEBUG
+ FILEFLAGS VS_FF_DEBUG
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_DLL
+ FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "CompanyName", "David Matos\0"
+            VALUE "FileDescription", "Shader Injector - D3D12 shader replacement mod\0"
+            VALUE "FileVersion", SHADER_INJECTOR_VERSION_STRING "\0"
+            VALUE "InternalName", "ShaderInjector\0"
+            VALUE "LegalCopyright", "Copyright (c) 2026 David Matos\0"
+            VALUE "OriginalFilename", "dsound.dll\0"
+            VALUE "ProductName", "Shader Injector\0"
+            VALUE "ProductVersion", SHADER_INJECTOR_VERSION_STRING "\0"
+            VALUE "Comments", "Open-source D3D12 shader injector for FINAL FANTASY VII REBIRTH\0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 1200
+    END
+END
