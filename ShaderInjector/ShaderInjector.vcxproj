@@ -152,8 +152,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="FPSCounter.h" />
-    <ClInclude Include="DatabaseShaderReplacements.h" />
-    <ClInclude Include="DatabaseShaderSources.h" />
+    <ClInclude Include="DatabaseShaderTargets.h" />
+	<ClInclude Include="DatabaseModifiedShaders.h" />
     <ClInclude Include="DatabaseGraphicsPSOs.h" />
     <ClInclude Include="Hash.h" />
     <ClInclude Include="HookD3D12.h" />
@@ -176,12 +176,20 @@
     <ClInclude Include="JsonHelper.h" />
     <ClInclude Include="dsound_proxy.h" />
     <ClInclude Include="Keycodes.h" />
-	<ClInclude Include="ProcessRunner.h" />
+    <ClInclude Include="ProcessRunner.h" />
+	<ClInclude Include="ShaderAnalysis.h" />
+	<ClInclude Include="ShaderAnalyzer.h" />
+	<ClInclude Include="ShaderDiscovery.h" />
+	<ClInclude Include="ShaderAutomaticDiscovery.h" />
+	<ClInclude Include="ModifiedShader.h" />
+	<ClInclude Include="ModifiedShaderCreation.h" />
+	<ClInclude Include="SimilarityScore.h" />
+	<ClInclude Include="ShaderInjectorVersion.h" />
     <ClInclude Include="ShaderInjectorGUITooltips.h" />
     <ClInclude Include="ShaderInjectorIO.h" />
     <ClInclude Include="ShaderInjectorSettings.h" />
     <ClInclude Include="DatabaseStreamPSOs.h" />
-    <ClInclude Include="ShaderReplacement.h" />
+    <ClInclude Include="ShaderTarget.h" />
     <ClInclude Include="ShaderTemplates.h" />
     <ClInclude Include="ShaderInjectorGUI.h" />
     <ClInclude Include="StringHelper.h" />
@@ -189,8 +197,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="FPSCounter.cpp" />
-    <ClCompile Include="DatabaseShaderReplacements.cpp" />
-    <ClCompile Include="DatabaseShaderSources.cpp" />
+    <ClCompile Include="DatabaseShaderTargets.cpp" />
+	<ClCompile Include="DatabaseModifiedShaders.cpp" />
     <ClCompile Include="DatabaseGraphicsPSOs.cpp" />
     <ClCompile Include="Hash.cpp" />
     <ClCompile Include="HookD3D12.cpp" />
@@ -217,9 +225,16 @@
     <ClCompile Include="dsound_proxy.cpp" />
     <ClCompile Include="Keycodes.cpp" />
 	<ClCompile Include="ProcessRunner.cpp" />
+	<ClCompile Include="ShaderAnalyzer.cpp" />
+	<ClCompile Include="ShaderAnalysis.cpp" />
+	<ClCompile Include="ShaderDiscovery.cpp" />
+	<ClCompile Include="ShaderAutomaticDiscovery.cpp" />
+	<ClCompile Include="ModifiedShader.cpp" />
+	<ClCompile Include="ModifiedShaderCreation.cpp" />
     <ClCompile Include="ShaderInjectorIO.cpp" />
     <ClCompile Include="DatabaseStreamPSOs.cpp" />
-    <ClCompile Include="ShaderReplacement.cpp" />
+    <ClCompile Include="ShaderTarget.cpp" />
+	<ClCompile Include="ShaderTargetSimilarity.cpp" />
     <ClCompile Include="ShaderTemplates.cpp" />
     <ClCompile Include="ShaderInjectorGUI.cpp" />
     <ClCompile Include="StringHelper.cpp" />

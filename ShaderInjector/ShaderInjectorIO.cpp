@@ -13,6 +13,7 @@
 
 #if defined(_WIN32)
 	#include <Windows.h>
+	#include <shellapi.h>
 #else
 	#include <limits.h>
 	#include <unistd.h>
@@ -141,6 +142,37 @@ namespace ShaderInjectorIO
 		FileSystem::create_directories(PathFromUtf8(directoryPath), error);
 	}
 
+	bool DeleteDirectoryRecursively(const std::string& directoryPath)
+	{
+		if (!DirectoryExists(directoryPath))
+			return false;
+
+		std::error_code error;
+		FileSystem::remove_all(PathFromUtf8(directoryPath), error);
+		return !error && !PathExists(directoryPath);
+	}
+
+	bool OpenDirectory(const std::string& directoryPath)
+	{
+		if (!DirectoryExists(directoryPath))
+			return false;
+
+#if defined(_WIN32)
+		const FileSystem::path nativePath = PathFromUtf8(directoryPath);
+		const HINSTANCE result = ShellExecuteW(
+			nullptr,
+			L"open",
+			nativePath.c_str(),
+			nullptr,
+			nullptr,
+			SW_SHOWNORMAL);
+		return reinterpret_cast<INT_PTR>(result) > 32;
+#else
+		const ProcessRunner::ProcessResult result = ProcessRunner::Run("/usr/bin/xdg-open", { directoryPath });
+		return result.Succeeded();
+#endif
+	}
+
 	std::string JoinPath(const std::string& directory, const std::string& childPath)
 	{
 		if (directory.empty())
@@ -199,6 +231,7 @@ namespace ShaderInjectorIO
 					error.clear();
 					continue;
 				}
+
 				collectEntry(*iterator);
 			}
 		}
@@ -211,6 +244,7 @@ namespace ShaderInjectorIO
 					error.clear();
 					continue;
 				}
+
 				collectEntry(*iterator);
 			}
 		}
@@ -289,19 +323,19 @@ namespace ShaderInjectorIO
 #endif
 	}
 
-	std::string GetShaderReplacementsDirectory()
+	std::string GetToolPathDXCompiler()
 	{
-		return JoinPath(GetShaderInjectorDirectory(), "ShaderReplacements");
+		return JoinPath(GetToolsDirectory(), "dxcompiler.dll");
 	}
 
-	std::string GetShaderSourcesDirectory()
+	std::string GetShaderTargetsDirectory()
 	{
-		return JoinPath(GetShaderInjectorDirectory(), "ShaderSources");
+		return JoinPath(GetShaderInjectorDirectory(), "ShaderTargets");
 	}
 
-	std::string GetShaderSourcesDirectory(const std::string& shaderTypeDirectoryName)
+	std::string GetModifiedShadersDirectory()
 	{
-		return JoinPath(GetShaderSourcesDirectory(), shaderTypeDirectoryName);
+		return JoinPath(GetShaderInjectorDirectory(), "ModifiedShaders");
 	}
 
 	std::string GetInjectorSettingsPath()
@@ -312,6 +346,7 @@ namespace ShaderInjectorIO
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| LOGS |||||||||||||||||||||||||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| LOGS |||||||||||||||||||||||||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| LOGS |||||||||||||||||||||||||||||||||||||||||||||||||||||
+
 	void RotateLogFiles()
 	{
 		std::lock_guard<std::mutex> lock(gLogMutex);
@@ -357,6 +392,7 @@ namespace ShaderInjectorIO
 
 		const std::time_t currentTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 		std::tm localTime{};
+
 #if defined(_WIN32)
 		localtime_s(&localTime, &currentTime);
 #else
@@ -695,8 +731,8 @@ namespace ShaderInjectorIO
 		std::string toolsDirectory = GetToolsDirectory();
 		std::string dumpDirectory = GetDumpsDirectory();
 		std::string uncapturedPSODirectory = GetUncapturedPSODirectory();
-		std::string shaderReplacementsDirectory = GetShaderReplacementsDirectory();
-		std::string shaderSourcesDirectory = GetShaderSourcesDirectory();
+		std::string shaderTargetsDirectory = GetShaderTargetsDirectory();
+		std::string modifiedShadersDirectory = GetModifiedShadersDirectory();
 		std::string injectorSettingsPath = GetInjectorSettingsPath();
 
 		//========================= INJECTOR SETTINGS =========================
@@ -745,38 +781,16 @@ namespace ShaderInjectorIO
 			WriteToLogFile("ShaderInjectorIO->Initalize: " + uncapturedPSODirectory + " did not exist! Created anyway.");
 		}
 
-		if (!DirectoryExists(shaderReplacementsDirectory))
+		if (!DirectoryExists(shaderTargetsDirectory))
 		{
-			DirectoryCreate(shaderReplacementsDirectory);
-			WriteToLogFile("ShaderInjectorIO->Initalize: " + shaderReplacementsDirectory + " did not exist! Created anyway.");
+			DirectoryCreate(shaderTargetsDirectory);
+			WriteToLogFile("ShaderInjectorIO->Initalize: " + shaderTargetsDirectory + " did not exist! Created anyway.");
 		}
 
-		if (!DirectoryExists(shaderSourcesDirectory))
+		if (!DirectoryExists(modifiedShadersDirectory))
 		{
-			DirectoryCreate(shaderSourcesDirectory);
-			WriteToLogFileWarning("ShaderInjectorIO->Initalize: " + shaderSourcesDirectory + " did not exist! Created anyway.");
-		}
-
-		//create sudirectories within shader injector sources for the different shader types that we can potentially create
-		const char* shaderSourceSubdirectories[] =
-		{
-			"VertexShaders",
-			"HullShaders",
-			"DomainShaders",
-			"GeometryShaders",
-			"PixelShaders",
-			"ComputeShaders",
-		};
-
-		for (const char* shaderSourceSubdirectory : shaderSourceSubdirectories)
-		{
-			std::string shaderSourceDirectory = GetShaderSourcesDirectory(shaderSourceSubdirectory);
-
-			if (!DirectoryExists(shaderSourceDirectory))
-			{
-				DirectoryCreate(shaderSourceDirectory);
-				WriteToLogFileWarning("ShaderInjectorIO->Initalize: " + shaderSourceDirectory + " did not exist! Created anyway.");
-			}
+			DirectoryCreate(modifiedShadersDirectory);
+			WriteToLogFileWarning("ShaderInjectorIO->Initalize: " + modifiedShadersDirectory + " did not exist! Created anyway.");
 		}
 
 		//========================= CREATE INTERNAL SHADER FILES =========================

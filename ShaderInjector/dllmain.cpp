@@ -11,6 +11,7 @@
 #include "Hooks.h"
 #include "dsound_proxy.h"
 #include "ShaderInjectorIO.h"
+#include "DatabaseModifiedShaders.h"
 
 //||||||||||||||||||||||||||||||| ON ATTACH |||||||||||||||||||||||||||||||
 //||||||||||||||||||||||||||||||| ON ATTACH |||||||||||||||||||||||||||||||
@@ -36,6 +37,7 @@ static DWORD WINAPI OnAttachDLL(LPVOID)
 
 	//initalize IO operations (folders, files, internal shader files)
 	ShaderInjectorIO::Initialize();
+	DatabaseModifiedShaders::RefreshModifiedShaders();
 
 	//IMPORTANT NOTE 2: We are able to create and run this thread, so this does execute and work!
 	//NOTE 1: keep this comment around for sanity check please!

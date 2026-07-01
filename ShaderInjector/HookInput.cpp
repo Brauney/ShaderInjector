@@ -91,7 +91,7 @@ namespace HookInput
 			if (key == Globals::keyToggleShaderInjector)
 			{
 				Globals::gShaderInjectorEnabled = !Globals::gShaderInjectorEnabled;
-				HookD3D12::MarkShaderReplacementApplyDirty();
+				HookD3D12::MarkShaderTargetApplyDirty();
 				return TRUE;
 			}
 		}

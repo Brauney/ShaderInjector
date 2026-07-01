@@ -2,10 +2,12 @@
 
 //custom
 #include "ShaderInjectorIO.h"
-#include "ShaderReplacement.h"
+#include "ShaderTarget.h"
 
 namespace ShaderTemplates
 {
+	const char* GetModifiedShaderSourceTemplate(ShaderTarget::ShaderType shaderType);
+
 	//NOTE: These are source code shader templates that the shader injector will auto-generate for various tasks.
 	//Now normally I would think it'd be wise to actually have these already serialized to the disk rather than holding them in memory.
 	//But... I do not trust users... so for sanity sake these will remain in memory.

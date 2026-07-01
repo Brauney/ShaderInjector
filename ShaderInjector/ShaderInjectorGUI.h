@@ -14,7 +14,7 @@
 #include "ShaderInjectorIO.h"
 #include "Hash.h"
 #include "Globals.h"
-#include "ShaderReplacement.h"
+#include "ShaderTarget.h"
 
 namespace ShaderInjectorGUI
 {
@@ -32,27 +32,30 @@ namespace ShaderInjectorGUI
 		DrawMenuFn drawMenu = nullptr;
 	};
 
-	void UI_ApplyStyle();
 	void DrawMainWindow(const MainWindowContext& context);
 	void UI_ShaderInjectorMenu();
 
-	//===================== shader replacements =====================
-	void UI_ShaderReplacements();
+	//===================== modified shaders =====================
+	void UI_ModifiedShaders();
+
+	//===================== shader targets =====================
+	void UI_ShaderTargets();
 
 	template<typename PipelineT>
-	bool PipelineUsesReplacement(const PipelineT& pipeline, const ShaderReplacement::ShaderReplacementDisk& replacement);
+	bool PipelineUsesReplacement(const PipelineT& pipeline, const ShaderTarget::ShaderTargetDisk& replacement);
 
-	void UI_ShaderReplacementSourceSection(ShaderReplacement::ShaderReplacementDisk& replacement, int replacementIndex);
+	void UI_ShaderTargetSourceSection(ShaderTarget::ShaderTargetDisk& replacement, int replacementIndex);
 
 	template<typename PipelineT>
 	void UI_DrawReplacementPSORow(const char* sourceList, int index, const PipelineT& pipeline);
-	void UI_ShaderReplacementPSOList(const ShaderReplacement::ShaderReplacementDisk& replacement);
-	int CountReplacementPSOs(const ShaderReplacement::ShaderReplacementDisk& replacement);
+	void UI_ShaderTargetPSOList(const ShaderTarget::ShaderTargetDisk& replacement);
+	int CountReplacementPSOs(const ShaderTarget::ShaderTargetDisk& replacement);
 
 	template<typename PipelineT>
-	bool PipelineUsesReplacement(const PipelineT& pipeline, const ShaderReplacement::ShaderReplacementDisk& replacement);
+	bool PipelineUsesReplacement(const PipelineT& pipeline, const ShaderTarget::ShaderTargetDisk& replacement);
 
 	//===================== developer settings =====================
+	void UI_DeveloperSettings();
 	void UI_AdapterInfo();
 	void UI_D3D12PipelineInfo();
 
@@ -70,7 +73,7 @@ namespace ShaderInjectorGUI
 		const char* idPrefix,
 		const char* sourceList,
 		std::vector<PipelineT>& pipelines,
-		ShaderReplacement::ShaderType shaderType,
+		ShaderTarget::ShaderType shaderType,
 		D3D12_PIPELINE_STATE_SUBOBJECT_TYPE subobjectType,
 		HookD3D12::PSOPendingRebuild::SourceList pendingSource,
 		bool allowMarkerToggle,
@@ -92,4 +95,7 @@ namespace ShaderInjectorGUI
 	void WriteToRuntimeLogSuccess(std::string text);
 	void WriteToRuntimeLogWarning(std::string text);
 	void ClearRuntimeLog();
+
+	//===================== style =====================
+	void UI_ApplyStyle();
 }

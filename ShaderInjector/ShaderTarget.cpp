@@ -1,14 +1,13 @@
-//ShaderReplacement.cpp
-#include "ShaderReplacement.h"
+//ShaderTarget.cpp
+#include "ShaderTarget.h"
 
 #include <fstream>
 #include <vector>
 
 //custom
 #include "ShaderInjectorIO.h"
-#include "StringHelper.h"
 
-namespace ShaderReplacement
+namespace ShaderTarget
 {
 	void MakePathFieldPortable(std::string& filePath)
 	{
@@ -24,19 +23,13 @@ namespace ShaderReplacement
 		filePath = ShaderInjectorIO::JoinPath(replacementDirectory, ShaderInjectorIO::FileNameFromPath(filePath));
 	}
 
-	std::string ShaderSourceSubdirectoryForType(ShaderReplacement::ShaderType shaderType)
-	{
-		return StringHelper::ShaderTypeToString(shaderType) + "s";
-	}
-
-	std::vector<std::string*> PathFields(ShaderReplacement::ShaderReplacementDisk& replacement)
+	std::vector<std::string*> PathFields(ShaderTarget::ShaderTargetDisk& replacement)
 	{
 		// These fields are stored beside the replacement JSON. Keeping them in one list
 		// makes save/load path normalization consistent for current and future metadata.
 		std::vector<std::string*> pathFields =
 		{
 			&replacement.originalShaderBlobPath,
-			&replacement.modifiedShaderBlobPath,
 			&replacement.jsonPath,
 			&replacement.pipelineCachedBlobPath,
 			&replacement.pipelineStreamBlobPath,
@@ -50,7 +43,7 @@ namespace ShaderReplacement
 			&replacement.domainShaderBlobPath,
 		};
 
-		for (ShaderReplacement::ShaderPipelineTemplateDisk& pipelineTemplate : replacement.pipelineTemplates)
+		for (ShaderTarget::ShaderPipelineTemplateDisk& pipelineTemplate : replacement.pipelineTemplates)
 		{
 			pathFields.push_back(&pipelineTemplate.pipelineCachedBlobPath);
 			pathFields.push_back(&pipelineTemplate.pipelineStreamBlobPath);
@@ -67,22 +60,15 @@ namespace ShaderReplacement
 		return pathFields;
 	}
 
-	void MakeReplacementPortableForDisk(ShaderReplacement::ShaderReplacementDisk& replacement)
+	void MakeReplacementPortableForDisk(ShaderTarget::ShaderTargetDisk& replacement)
 	{
-		// JSON should remain portable between machines, so persist filenames only.
-		if (replacement.shaderSourceName.empty() && !replacement.shaderSourcePath.empty())
-			replacement.shaderSourceName = ShaderInjectorIO::FileNameFromPath(replacement.shaderSourcePath);
-
-		if (!replacement.shaderSourceName.empty())
-			replacement.shaderSourcePath = replacement.shaderSourceName;
-
 		for (std::string* filePath : PathFields(replacement))
 			MakePathFieldPortable(*filePath);
 
 		replacement.replacementDirectory = ".";
 	}
 
-	void ResolveReplacementPathsFromJsonLocation(ShaderReplacement::ShaderReplacementDisk& replacement, const std::string& jsonPath)
+	void ResolveReplacementPathsFromJsonLocation(ShaderTarget::ShaderTargetDisk& replacement, const std::string& jsonPath)
 	{
 		const std::string replacementDirectory = ShaderInjectorIO::DirectoryFromPath(jsonPath);
 		replacement.replacementDirectory = replacementDirectory;
@@ -90,59 +76,38 @@ namespace ShaderReplacement
 		for (std::string* filePath : PathFields(replacement))
 			ResolvePathField(*filePath, replacementDirectory);
 
-		const std::string legacySourcePath = replacement.shaderSourcePath.empty()
-			? ""
-			: ShaderInjectorIO::JoinPath(replacementDirectory, ShaderInjectorIO::FileNameFromPath(replacement.shaderSourcePath));
-
-		if (replacement.shaderSourceName.empty() && !replacement.shaderSourcePath.empty())
-			replacement.shaderSourceName = ShaderInjectorIO::FileNameFromPath(replacement.shaderSourcePath);
-
-		if (!replacement.shaderSourceName.empty())
-		{
-			// Shader source files now live under the centralized ShaderSources tree.
-			// This migration keeps older per-replacement source files usable.
-			const std::string centralSourceDirectory = ShaderInjectorIO::GetShaderSourcesDirectory(ShaderSourceSubdirectoryForType(replacement.shaderType));
-			const std::string centralSourcePath = ShaderInjectorIO::JoinPath(centralSourceDirectory, replacement.shaderSourceName);
-
-			ShaderInjectorIO::DirectoryCreate(ShaderInjectorIO::GetShaderSourcesDirectory());
-			ShaderInjectorIO::DirectoryCreate(centralSourceDirectory);
-
-			if (!legacySourcePath.empty() && !ShaderInjectorIO::FileExists(centralSourcePath))
-				ShaderInjectorIO::CopyFileIfMissing(legacySourcePath, centralSourcePath);
-
-			replacement.shaderSourcePath = centralSourcePath;
-		}
-
 		replacement.jsonPath = jsonPath;
 	}
 
-	bool IsShaderReplacementJsonFilename(const char* filename)
+	bool IsShaderTargetJsonFilename(const char* filename)
 	{
 		if (!filename)
 			return false;
 
 		const std::string name = filename;
-		return name == "ShaderReplacement.json";
+		return name == "ShaderTarget.json";
 	}
 
-	bool WriteShaderReplacementJson(const ShaderReplacement::ShaderReplacementDisk& replacement)
+	bool WriteShaderTargetJson(const ShaderTarget::ShaderTargetDisk& replacement)
 	{
 		std::ofstream jsonFile(replacement.jsonPath, std::ios::out | std::ios::trunc);
 
 		if (!jsonFile.is_open())
 			return false;
 
-		ShaderReplacement::ShaderReplacementDisk portableReplacement = replacement;
+		ShaderTarget::ShaderTargetDisk portableReplacement = replacement;
 		MakeReplacementPortableForDisk(portableReplacement);
 
 		nlohmann::ordered_json json = portableReplacement;
+		json["shaderBytecodeHashAliases"] = portableReplacement.shaderBytecodeHashAliases;
+		json["originalShaderAnalysis"] = portableReplacement.originalShaderAnalysis;
 		json["pipelineTemplates"] = portableReplacement.pipelineTemplates;
 		jsonFile << json.dump(4);
 
 		return !jsonFile.fail();
 	}
 
-	bool LoadShaderReplacementJson(const std::string& path, ShaderReplacement::ShaderReplacementDisk& outReplacement)
+	bool LoadShaderTargetJson(const std::string& path, ShaderTarget::ShaderTargetDisk& outReplacement)
 	{
 		try
 		{
@@ -153,9 +118,13 @@ namespace ShaderReplacement
 
 			nlohmann::ordered_json json{};
 			jsonFile >> json;
-			outReplacement = json.get<ShaderReplacement::ShaderReplacementDisk>();
+			outReplacement = json.get<ShaderTarget::ShaderTargetDisk>();
+			if (json.contains("shaderBytecodeHashAliases") && json["shaderBytecodeHashAliases"].is_array())
+				outReplacement.shaderBytecodeHashAliases = json["shaderBytecodeHashAliases"].get<std::vector<std::string>>();
+			if (json.contains("originalShaderAnalysis") && json["originalShaderAnalysis"].is_object())
+				outReplacement.originalShaderAnalysis = json["originalShaderAnalysis"].get<ShaderAnalysis::ShaderAnalysisDisk>();
 			if (json.contains("pipelineTemplates") && json["pipelineTemplates"].is_array())
-				outReplacement.pipelineTemplates = json["pipelineTemplates"].get<std::vector<ShaderReplacement::ShaderPipelineTemplateDisk>>();
+				outReplacement.pipelineTemplates = json["pipelineTemplates"].get<std::vector<ShaderTarget::ShaderPipelineTemplateDisk>>();
 
 			ResolveReplacementPathsFromJsonLocation(outReplacement, path);
 
@@ -167,7 +136,7 @@ namespace ShaderReplacement
 		}
 	}
 
-	bool WritePipelineStreamMetadataJson(const std::string& path, const ShaderReplacement::ShaderPipelineStreamMetadataDisk& metadata)
+	bool WritePipelineStreamMetadataJson(const std::string& path, const ShaderTarget::ShaderPipelineStreamMetadataDisk& metadata)
 	{
 		std::ofstream jsonFile(path, std::ios::out | std::ios::trunc);
 
@@ -180,7 +149,7 @@ namespace ShaderReplacement
 		return !jsonFile.fail();
 	}
 
-	bool LoadPipelineStreamMetadataJson(const std::string& path, ShaderReplacement::ShaderPipelineStreamMetadataDisk& outMetadata)
+	bool LoadPipelineStreamMetadataJson(const std::string& path, ShaderTarget::ShaderPipelineStreamMetadataDisk& outMetadata)
 	{
 		try
 		{
@@ -191,7 +160,7 @@ namespace ShaderReplacement
 
 			nlohmann::ordered_json json{};
 			jsonFile >> json;
-			outMetadata = json.get<ShaderReplacement::ShaderPipelineStreamMetadataDisk>();
+			outMetadata = json.get<ShaderTarget::ShaderPipelineStreamMetadataDisk>();
 			return true;
 		}
 		catch (...)
@@ -200,14 +169,14 @@ namespace ShaderReplacement
 		}
 	}
 
-	void CollectShaderReplacementJsonFiles(const std::string& directory, std::vector<std::string>& outJsonFiles)
+	void CollectShaderTargetJsonFiles(const std::string& directory, std::vector<std::string>& outJsonFiles)
 	{
 		std::vector<std::string> jsonFiles;
 		ShaderInjectorIO::CollectFilesByExtension(directory, ShaderInjectorIO::extensionJSON, jsonFiles, true);
 
 		for (const std::string& jsonFile : jsonFiles)
 		{
-			if (IsShaderReplacementJsonFilename(ShaderInjectorIO::FileNameFromPath(jsonFile).c_str()))
+			if (IsShaderTargetJsonFilename(ShaderInjectorIO::FileNameFromPath(jsonFile).c_str()))
 				outJsonFiles.push_back(jsonFile);
 		}
 	}

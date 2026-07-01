@@ -32,7 +32,7 @@ namespace HookD3D12
 		return outHash != 0;
 	}
 
-	ID3D12RootSignature* GetOrCreatePersistedRootSignature(const ShaderReplacement::ShaderReplacementDisk& replacement, ID3D12Device* device)
+	ID3D12RootSignature* GetOrCreatePersistedRootSignature(const ShaderTarget::ShaderTargetDisk& replacement, ID3D12Device* device)
 	{
 		if (replacement.rootSignatureBlobPath.empty() || !device)
 			return nullptr;

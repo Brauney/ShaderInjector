@@ -6,8 +6,17 @@
 
 //3RD Party
 #include "JsonHelper.h" //NLOHMANN
+#include "ShaderAnalysis.h"
 
-namespace ShaderReplacement
+/*
+* Shader Target:
+* This is a collection of data structures that hold as much data as possible in regards to the original PSO
+* These should be automatically generated based on the users created/set modified shaders.
+* The purpose is that these target specific PSOs that get collected within the game through DX12 hooks on a fresh shader cache
+* Then based on the loaded modified shaders, if there is matching original bytecode (or other characteristics that the modified shader is intending to replace)
+* These targets will use the modified shader bytecode, and the original PSO will be rebuilt so the game uses mostly the same PSO but with our modified shader bytecode.
+*/
+namespace ShaderTarget
 {
 	enum ShaderType
 	{
@@ -62,6 +71,9 @@ namespace ShaderReplacement
 		std::string streamOutputDeclarationCount;
 		std::string streamOutputSignature;
 
+		double CalculateSimilarityScore(const ShaderPipelineTemplateDisk& other) const;
+		static double CalculateSimilarityScore(const std::vector<ShaderPipelineTemplateDisk>& left, const std::vector<ShaderPipelineTemplateDisk>& right);
+
 		NLOHMANN_ORDERED_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
 			ShaderPipelineTemplateDisk,
 			name,
@@ -103,13 +115,13 @@ namespace ShaderReplacement
 	};
 
 	//data structure holding information about the replacement shader serialized to the disk (JSON TEXT)
-	struct ShaderReplacementDisk
+	struct ShaderTargetDisk
 	{
-		int schemaVersion = 1;
+		int schemaVersion = 5;
 		bool enabled = true;
 
 		//name of the replacement shader
-		//by default if one isn't specified it should just be ShaderReplacement_{HASH}
+		//by default if one isn't specified it should just be ShaderTarget_{HASH}
 		std::string name;
 
 		ShaderType shaderType = Unknown;
@@ -119,18 +131,20 @@ namespace ShaderReplacement
 		std::string shaderEntryPoint = "main";
 
 		std::string originalShaderBytecodeHash;
+		std::vector<std::string> shaderBytecodeHashAliases;
 		std::string originalShaderBytecodeLength;
 		std::string originalShaderBlobPath;
+		ShaderAnalysis::ShaderAnalysisDisk originalShaderAnalysis;
 
-		//HLSL shader source
-		std::string shaderSourceName;
-		std::string shaderSourcePath;
-
-		//Compiled shader
-		std::string modifiedShaderBlobPath;
+		// Stable ID of the ModifiedShader package that supplies replacement HLSL.
+		std::string modifiedShaderId;
 
 		std::string replacementDirectory;
 		std::string jsonPath;
+
+		// Runtime-only cache resolved from modifiedShaderId. This path is never
+		// serialized and always points into the ModifiedShader package directory.
+		std::string modifiedShaderBlobPath;
 
 		std::string sourceList;
 		std::string pipelineIndex;
@@ -184,11 +198,12 @@ namespace ShaderReplacement
 		std::string streamOutputSignature;
 		std::vector<ShaderPipelineTemplateDisk> pipelineTemplates;
 
-		std::string notes;
+		double CalculateSimilarityScore(const ShaderTargetDisk& other) const;
+		static double CalculateSimilarityScore(const std::vector<ShaderTargetDisk>& left, const std::vector<ShaderTargetDisk>& right);
 
 		//JSON support
 		NLOHMANN_ORDERED_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
-			ShaderReplacementDisk,
+			ShaderTargetDisk,
 			schemaVersion,
 			enabled,
 			name,
@@ -198,9 +213,7 @@ namespace ShaderReplacement
 			originalShaderBytecodeHash,
 			originalShaderBytecodeLength,
 			originalShaderBlobPath,
-			shaderSourceName,
-			shaderSourcePath,
-			modifiedShaderBlobPath,
+			modifiedShaderId,
 			replacementDirectory,
 			jsonPath,
 			sourceList,
@@ -250,8 +263,7 @@ namespace ShaderReplacement
 			inputLayoutElementCount,
 			inputLayoutSignature,
 			streamOutputDeclarationCount,
-			streamOutputSignature,
-			notes)
+			streamOutputSignature)
 	};
 
 	struct ShaderInputElementDisk
@@ -263,6 +275,9 @@ namespace ShaderReplacement
 		uint32_t alignedByteOffset = 0;
 		uint32_t inputSlotClass = 0;
 		uint32_t instanceDataStepRate = 0;
+
+		double CalculateSimilarityScore(const ShaderInputElementDisk& other) const;
+		static double CalculateSimilarityScore(const std::vector<ShaderInputElementDisk>& left, const std::vector<ShaderInputElementDisk>& right);
 
 		//JSON support
 		NLOHMANN_ORDERED_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
@@ -284,6 +299,9 @@ namespace ShaderReplacement
 		uint32_t componentCount = 0;
 		uint32_t outputSlot = 0;
 
+		double CalculateSimilarityScore(const ShaderStreamOutputDeclarationDisk& other) const;
+		static double CalculateSimilarityScore(const std::vector<ShaderStreamOutputDeclarationDisk>& left, const std::vector<ShaderStreamOutputDeclarationDisk>& right);
+
 		//JSON support
 		NLOHMANN_ORDERED_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
 			ShaderStreamOutputDeclarationDisk,
@@ -300,6 +318,9 @@ namespace ShaderReplacement
 		std::vector<ShaderStreamOutputDeclarationDisk> streamOutputDeclarations;
 		std::vector<uint32_t> streamOutputStrides;
 
+		double CalculateSimilarityScore(const ShaderPipelineStreamMetadataDisk& other) const;
+		static double CalculateSimilarityScore(const std::vector<ShaderPipelineStreamMetadataDisk>& left, const std::vector<ShaderPipelineStreamMetadataDisk>& right);
+
 		//JSON support
 		NLOHMANN_ORDERED_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
 			ShaderPipelineStreamMetadataDisk,
@@ -308,9 +329,9 @@ namespace ShaderReplacement
 			streamOutputStrides)
 	};
 
-	bool WriteShaderReplacementJson(const ShaderReplacement::ShaderReplacementDisk& replacement);
-	bool LoadShaderReplacementJson(const std::string& path, ShaderReplacement::ShaderReplacementDisk& outReplacement);
-	bool WritePipelineStreamMetadataJson(const std::string& path, const ShaderReplacement::ShaderPipelineStreamMetadataDisk& metadata);
-	bool LoadPipelineStreamMetadataJson(const std::string& path, ShaderReplacement::ShaderPipelineStreamMetadataDisk& outMetadata);
-	void CollectShaderReplacementJsonFiles(const std::string& directory, std::vector<std::string>& outJsonFiles);
+	bool WriteShaderTargetJson(const ShaderTarget::ShaderTargetDisk& replacement);
+	bool LoadShaderTargetJson(const std::string& path, ShaderTarget::ShaderTargetDisk& outReplacement);
+	bool WritePipelineStreamMetadataJson(const std::string& path, const ShaderTarget::ShaderPipelineStreamMetadataDisk& metadata);
+	bool LoadPipelineStreamMetadataJson(const std::string& path, ShaderTarget::ShaderPipelineStreamMetadataDisk& outMetadata);
+	void CollectShaderTargetJsonFiles(const std::string& directory, std::vector<std::string>& outJsonFiles);
 }

@@ -26,6 +26,8 @@ namespace ShaderInjectorIO
 	bool WriteTextFileIfMissing(const std::string& path, const std::string& text);
 	bool DirectoryExists(const std::string& path);
 	void DirectoryCreate(const std::string& path);
+	bool DeleteDirectoryRecursively(const std::string& path);
+	bool OpenDirectory(const std::string& path);
 	std::string JoinPath(const std::string& directory, const std::string& childPath);
 	std::string DirectoryFromPath(const std::string& path);
 	std::string FileNameFromPath(const std::string& path);
@@ -42,9 +44,9 @@ namespace ShaderInjectorIO
 	std::string GetPreviousLogFilePath();
 	std::string GetToolsDirectory();
 	std::string GetToolPathDXC();
-	std::string GetShaderReplacementsDirectory();
-	std::string GetShaderSourcesDirectory();
-	std::string GetShaderSourcesDirectory(const std::string& shaderTypeDirectoryName);
+	std::string GetToolPathDXCompiler();
+	std::string GetShaderTargetsDirectory();
+	std::string GetModifiedShadersDirectory();
 	std::string GetInjectorSettingsPath();
 
 	//logs

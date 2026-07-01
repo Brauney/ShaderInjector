@@ -30,7 +30,7 @@ namespace HookD3D12
 		return true;
 	}
 
-	void BackfillReplacementPortableMetadataFromSidecars(ShaderReplacement::ShaderReplacementDisk& replacement)
+	void BackfillReplacementPortableMetadataFromSidecars(ShaderTarget::ShaderTargetDisk& replacement)
 	{
 		if (!replacement.rootSignatureBlobPath.empty())
 		{
@@ -53,7 +53,7 @@ namespace HookD3D12
 		FillStreamReplacementPortableStateFromBlob(replacement, persistedPipeline);
 	}
 
-	bool LoadPersistedStreamTemplateFromReplacement(const ShaderReplacement::ShaderReplacementDisk& replacement, PipelineStateInfo& outPipeline)
+	bool LoadPersistedStreamTemplateFromReplacement(const ShaderTarget::ShaderTargetDisk& replacement, PipelineStateInfo& outPipeline)
 	{
 		outPipeline = PipelineStateInfo{};
 
@@ -82,9 +82,9 @@ namespace HookD3D12
 
 		if (!replacement.pipelineStreamMetadataPath.empty())
 		{
-			ShaderReplacement::ShaderPipelineStreamMetadataDisk metadata{};
+			ShaderTarget::ShaderPipelineStreamMetadataDisk metadata{};
 
-			if (!ShaderReplacement::LoadPipelineStreamMetadataJson(replacement.pipelineStreamMetadataPath, metadata))
+			if (!ShaderTarget::LoadPipelineStreamMetadataJson(replacement.pipelineStreamMetadataPath, metadata))
 			{
 				ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12ReplacementTemplates->LoadPersistedStreamTemplateFromReplacement: missing stream metadata for " + replacement.name);
 				return false;
@@ -96,26 +96,26 @@ namespace HookD3D12
 		return true;
 	}
 
-	uint64_t StreamShaderHashForType(const PipelineStateInfo& pipeline, ShaderReplacement::ShaderType shaderType)
+	uint64_t StreamShaderHashForType(const PipelineStateInfo& pipeline, ShaderTarget::ShaderType shaderType)
 	{
 		switch (shaderType)
 		{
-			case ShaderReplacement::VertexShader: return pipeline.vsHash;
-			case ShaderReplacement::HullShader: return pipeline.hsHash;
-			case ShaderReplacement::DomainShader: return pipeline.dsHash;
-			case ShaderReplacement::GeometryShader: return pipeline.gsHash;
-			case ShaderReplacement::PixelShader: return pipeline.psHash;
-			case ShaderReplacement::ComputeShader: return pipeline.csHash;
+			case ShaderTarget::VertexShader: return pipeline.vsHash;
+			case ShaderTarget::HullShader: return pipeline.hsHash;
+			case ShaderTarget::DomainShader: return pipeline.dsHash;
+			case ShaderTarget::GeometryShader: return pipeline.gsHash;
+			case ShaderTarget::PixelShader: return pipeline.psHash;
+			case ShaderTarget::ComputeShader: return pipeline.csHash;
 			default: return 0;
 		}
 	}
 
-	bool StreamPipelineHasShaderHash(const PipelineStateInfo& pipeline, ShaderReplacement::ShaderType shaderType, uint64_t shaderHash)
+	bool StreamPipelineHasShaderHash(const PipelineStateInfo& pipeline, ShaderTarget::ShaderType shaderType, uint64_t shaderHash)
 	{
 		return shaderHash != 0 && StreamShaderHashForType(pipeline, shaderType) == shaderHash;
 	}
 
-	void FillPipelineTemplateCommonState(ShaderReplacement::ShaderPipelineTemplateDisk& pipelineTemplate, const PipelineStateInfo& pipeline)
+	void FillPipelineTemplateCommonState(ShaderTarget::ShaderPipelineTemplateDisk& pipelineTemplate, const PipelineStateInfo& pipeline)
 	{
 		pipelineTemplate.vsHash = pipeline.vsHash ? Hash::FormatHash(pipeline.vsHash) : "";
 		pipelineTemplate.psHash = pipeline.psHash ? Hash::FormatHash(pipeline.psHash) : "";
@@ -137,9 +137,9 @@ namespace HookD3D12
 		pipelineTemplate.pipelineStreamSubobjectTypes = PipelineStreamSubobjectTypeSignature(pipeline.streamBlob);
 	}
 
-	ShaderReplacement::ShaderReplacementDisk ReplacementWithPipelineTemplate(const ShaderReplacement::ShaderReplacementDisk& replacement, const ShaderReplacement::ShaderPipelineTemplateDisk& pipelineTemplate)
+	ShaderTarget::ShaderTargetDisk ReplacementWithPipelineTemplate(const ShaderTarget::ShaderTargetDisk& replacement, const ShaderTarget::ShaderPipelineTemplateDisk& pipelineTemplate)
 	{
-		ShaderReplacement::ShaderReplacementDisk templateReplacement = replacement;
+		ShaderTarget::ShaderTargetDisk templateReplacement = replacement;
 		templateReplacement.name = replacement.name + "/" + pipelineTemplate.name;
 		templateReplacement.pipelineIndex = pipelineTemplate.pipelineIndex;
 		templateReplacement.psoPointer = pipelineTemplate.psoPointer;
@@ -190,7 +190,7 @@ namespace HookD3D12
 		return matches;
 	}
 
-	bool WriteStreamPipelineTemplateVariant(ShaderReplacement::ShaderReplacementDisk& replacement, const PipelineStateInfo& pipeline, int pipelineIndex, int templateIndex, bool& ok)
+	bool WriteStreamPipelineTemplateVariant(ShaderTarget::ShaderTargetDisk& replacement, const PipelineStateInfo& pipeline, int pipelineIndex, int templateIndex, bool& ok)
 	{
 		if (pipeline.streamBlob.empty())
 			return false;
@@ -198,7 +198,7 @@ namespace HookD3D12
 		char prefix[64]{};
 		sprintf_s(prefix, "PipelineTemplate_%03d", templateIndex);
 
-		ShaderReplacement::ShaderPipelineTemplateDisk pipelineTemplate{};
+		ShaderTarget::ShaderPipelineTemplateDisk pipelineTemplate{};
 		pipelineTemplate.name = prefix;
 		pipelineTemplate.sourceList = "Stream";
 		pipelineTemplate.pipelineIndex = std::to_string(pipelineIndex);
@@ -234,8 +234,8 @@ namespace HookD3D12
 		if (!pipeline.dsBytecode.empty()) pipelineTemplate.domainShaderBlobPath = ShaderInjectorIO::JoinPath(replacement.replacementDirectory, std::string(prefix) + "_OriginalDomainShaderBytecode" + ShaderInjectorIO::extensionBIN);
 
 		ok = ShaderInjectorIO::WriteBinaryFile(pipelineTemplate.pipelineStreamBlobPath, pipeline.streamBlob.data(), pipeline.streamBlob.size()) && ok;
-		ShaderReplacement::ShaderPipelineStreamMetadataDisk metadata = BuildPipelineStreamMetadata(pipeline);
-		ok = ShaderReplacement::WritePipelineStreamMetadataJson(pipelineTemplate.pipelineStreamMetadataPath, metadata) && ok;
+		ShaderTarget::ShaderPipelineStreamMetadataDisk metadata = BuildPipelineStreamMetadata(pipeline);
+		ok = ShaderTarget::WritePipelineStreamMetadataJson(pipelineTemplate.pipelineStreamMetadataPath, metadata) && ok;
 		if (!cachedBlob.empty() && !pipelineTemplate.pipelineCachedBlobPath.empty()) ok = ShaderInjectorIO::WriteBinaryFile(pipelineTemplate.pipelineCachedBlobPath, cachedBlob.data(), cachedBlob.size()) && ok;
 		if (!rootSignatureBlob.empty() && !pipelineTemplate.rootSignatureBlobPath.empty()) ok = ShaderInjectorIO::WriteBinaryFile(pipelineTemplate.rootSignatureBlobPath, rootSignatureBlob.data(), rootSignatureBlob.size()) && ok;
 		if (!pipeline.vsBytecode.empty() && !pipelineTemplate.vertexShaderBlobPath.empty()) ok = ShaderInjectorIO::WriteBinaryFile(pipelineTemplate.vertexShaderBlobPath, pipeline.vsBytecode.data(), pipeline.vsBytecode.size()) && ok;
@@ -249,29 +249,81 @@ namespace HookD3D12
 		return true;
 	}
 
-	void WriteMatchingStreamPipelineTemplateVariants(ShaderReplacement::ShaderReplacementDisk& replacement, ShaderReplacement::ShaderType shaderType, uint64_t shaderHash, bool& ok)
+	void WriteMatchingStreamPipelineTemplateVariants(ShaderTarget::ShaderTargetDisk& replacement, ShaderTarget::ShaderType shaderType, uint64_t shaderHash, bool& ok)
 	{
 		if (shaderHash == 0)
 			return;
 
-		int templateIndex = 0;
+		int templateIndex = static_cast<int>(replacement.pipelineTemplates.size());
+		int capturedTemplateCount = 0;
 		for (int i = 0; i < (int)gPipelineStates.size(); ++i)
 		{
 			const PipelineStateInfo& pipeline = gPipelineStates[i];
 			if (!StreamPipelineHasShaderHash(pipeline, shaderType, shaderHash))
 				continue;
 
-			WriteStreamPipelineTemplateVariant(replacement, pipeline, i, templateIndex++, ok);
+			if (WriteStreamPipelineTemplateVariant(replacement, pipeline, i, templateIndex++, ok))
+				++capturedTemplateCount;
 		}
 
-		if (templateIndex > 1)
-			ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12ReplacementTemplates->WriteMatchingStreamPipelineTemplateVariants: Captured stream pipeline template variants for " + replacement.name + ": " + std::to_string(templateIndex));
+		if (capturedTemplateCount > 1)
+			ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12ReplacementTemplates->WriteMatchingStreamPipelineTemplateVariants: Captured stream pipeline template variants for " + replacement.name + ": " + std::to_string(capturedTemplateCount));
+	}
+
+	bool PersistStreamPipelineTemplatesForShaderAlias(
+		ShaderTarget::ShaderTargetDisk& replacement,
+		ShaderTarget::ShaderType shaderType,
+		uint64_t shaderHash)
+	{
+		if (shaderHash == 0)
+			return false;
+
+		auto templateShaderHash = [shaderType](const ShaderTarget::ShaderPipelineTemplateDisk& pipelineTemplate)
+		{
+			switch (shaderType)
+			{
+				case ShaderTarget::VertexShader: return Hash::ParseHashText(pipelineTemplate.vsHash);
+				case ShaderTarget::HullShader: return Hash::ParseHashText(pipelineTemplate.hsHash);
+				case ShaderTarget::DomainShader: return Hash::ParseHashText(pipelineTemplate.dsHash);
+				case ShaderTarget::GeometryShader: return Hash::ParseHashText(pipelineTemplate.gsHash);
+				case ShaderTarget::PixelShader: return Hash::ParseHashText(pipelineTemplate.psHash);
+				case ShaderTarget::ComputeShader: return Hash::ParseHashText(pipelineTemplate.csHash);
+				default: return uint64_t{ 0 };
+			}
+		};
+
+		for (const ShaderTarget::ShaderPipelineTemplateDisk& pipelineTemplate : replacement.pipelineTemplates)
+		{
+			if (templateShaderHash(pipelineTemplate) == shaderHash)
+				return false;
+		}
+
+		const size_t previousTemplateCount = replacement.pipelineTemplates.size();
+		bool writeSucceeded = true;
+		WriteMatchingStreamPipelineTemplateVariants(replacement, shaderType, shaderHash, writeSucceeded);
+		if (replacement.pipelineTemplates.size() == previousTemplateCount)
+			return false;
+
+		replacement.schemaVersion = 5;
+		writeSucceeded = ShaderTarget::WriteShaderTargetJson(replacement) && writeSucceeded;
+		if (!writeSucceeded)
+		{
+			ShaderInjectorGUI::WriteToRuntimeLogError(
+				"HookD3D12ReplacementTemplates->PersistStreamPipelineTemplatesForShaderAlias: failed for " + replacement.name);
+			return false;
+		}
+
+		ShaderInjectorGUI::WriteToRuntimeLogSuccess(
+			"HookD3D12ReplacementTemplates->PersistStreamPipelineTemplatesForShaderAlias: captured " +
+			std::to_string(replacement.pipelineTemplates.size() - previousTemplateCount) +
+			" current-version templates for " + replacement.name);
+		return true;
 	}
 
 	bool SelectPersistedPipelineTemplateForUncaptured(
-		const ShaderReplacement::ShaderReplacementDisk& replacement,
+		const ShaderTarget::ShaderTargetDisk& replacement,
 		const UncapturedPipelineStateInfo& uncaptured,
-		ShaderReplacement::ShaderReplacementDisk& outTemplateReplacement,
+		ShaderTarget::ShaderTargetDisk& outTemplateReplacement,
 		std::string& outTemplateName,
 		SIZE_T& outMatchingBytes)
 	{
@@ -288,7 +340,7 @@ namespace HookD3D12
 
 		for (int i = 0; i < (int)replacement.pipelineTemplates.size(); ++i)
 		{
-			const ShaderReplacement::ShaderPipelineTemplateDisk& pipelineTemplate = replacement.pipelineTemplates[i];
+			const ShaderTarget::ShaderPipelineTemplateDisk& pipelineTemplate = replacement.pipelineTemplates[i];
 			const uint64_t templateHash = Hash::ParseHashText(pipelineTemplate.pipelineCachedBlobHash);
 			if (templateHash != 0 && templateHash == uncaptured.cachedBlobHash)
 			{
@@ -322,7 +374,7 @@ namespace HookD3D12
 		if (selectedIndex < 0)
 			return true;
 
-		const ShaderReplacement::ShaderPipelineTemplateDisk& selectedTemplate = replacement.pipelineTemplates[selectedIndex];
+		const ShaderTarget::ShaderPipelineTemplateDisk& selectedTemplate = replacement.pipelineTemplates[selectedIndex];
 		outTemplateReplacement = ReplacementWithPipelineTemplate(replacement, selectedTemplate);
 		outTemplateName = selectedTemplate.name;
 		outMatchingBytes = exactHashIndex >= 0 ? uncaptured.cachedBlobSize : bestMatchingBytes;

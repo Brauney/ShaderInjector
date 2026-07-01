@@ -6,6 +6,7 @@
 #include "DatabaseGraphicsPSOs.h"
 #include "Hash.h"
 #include "HookD3D12PipelineRegistry.h"
+#include "ShaderAutomaticDiscovery.h"
 
 namespace HookD3D12
 {
@@ -111,10 +112,11 @@ namespace HookD3D12
 		capturedPipeline.originalDesc.CachedPSO.pCachedBlob = nullptr;
 		capturedPipeline.originalDesc.CachedPSO.CachedBlobSizeInBytes = 0;
 
+		ShaderAutomaticDiscovery::ProcessCapturedGraphicsPipeline(capturedPipeline);
 		std::lock_guard<std::mutex> lock(gPipelineMutex);
 		RegisterKnownPipelineStateLocked(pipelineState);
 		gGraphicsPipelines.push_back(capturedPipeline);
-		MarkShaderReplacementApplyDirty();
+		MarkShaderTargetApplyDirty();
 	}
 
 	void CaptureComputePipelineState(const D3D12_COMPUTE_PIPELINE_STATE_DESC* pipelineDescription, ID3D12PipelineState* pipelineState, bool shouldRegisterAsKnownPipeline)

@@ -8,7 +8,7 @@
 #include <vector>
 
 //custom
-#include "ShaderReplacement.h"
+#include "ShaderTarget.h"
 
 namespace HookD3D12
 {
@@ -68,10 +68,10 @@ namespace HookD3D12
 		ID3D12PipelineState* psoWithoutPS = nullptr;
 
 		ID3D12PipelineState* psoWithReplacement = nullptr;
-		std::string activeShaderReplacementName;
-		ShaderReplacement::ShaderType activeShaderReplacementType = ShaderReplacement::Unknown;
-		uint64_t activeShaderReplacementHash = 0;
-		bool activeShaderReplacementUsesFallback = false;
+		std::string activeShaderTargetName;
+		ShaderTarget::ShaderType activeShaderTargetType = ShaderTarget::Unknown;
+		uint64_t activeShaderTargetHash = 0;
+		bool activeShaderTargetUsesFallback = false;
 
 		std::vector<D3D12_INPUT_ELEMENT_DESC> inputElements;
 		std::vector<std::string> inputElementSemanticNames;
@@ -105,10 +105,10 @@ namespace HookD3D12
 		bool dsDisabled = false;  ID3D12PipelineState* psoWithoutDS = nullptr;
 
 		ID3D12PipelineState* psoWithReplacement = nullptr;
-		std::string activeShaderReplacementName;
-		ShaderReplacement::ShaderType activeShaderReplacementType = ShaderReplacement::Unknown;
-		uint64_t activeShaderReplacementHash = 0;
-		bool activeShaderReplacementUsesFallback = false;
+		std::string activeShaderTargetName;
+		ShaderTarget::ShaderType activeShaderTargetType = ShaderTarget::Unknown;
+		uint64_t activeShaderTargetHash = 0;
+		bool activeShaderTargetUsesFallback = false;
 
 		std::vector<D3D12_INPUT_ELEMENT_DESC> inputElements;
 		std::vector<std::string> inputElementSemanticNames;
@@ -134,9 +134,9 @@ namespace HookD3D12
 		ID3D12PipelineState* replacementPipelineState = nullptr;
 		ID3D12RootSignature* observedGraphicsRootSignature = nullptr;
 		ID3D12RootSignature* observedComputeRootSignature = nullptr;
-		std::string activeShaderReplacementName;
-		ShaderReplacement::ShaderType activeShaderReplacementType = ShaderReplacement::Unknown;
-		uint64_t activeShaderReplacementHash = 0;
+		std::string activeShaderTargetName;
+		ShaderTarget::ShaderType activeShaderTargetType = ShaderTarget::Unknown;
+		uint64_t activeShaderTargetHash = 0;
 	};
 
 	struct FrameContext
@@ -173,16 +173,16 @@ namespace HookD3D12
 	extern std::vector<GraphicsPipelineInfo> gGraphicsPipelines;
 	extern D3D12PipelineInfo gPipelineInfo;
 	extern std::vector<PipelineStateInfo> gPipelineStates;
-	extern std::vector<ShaderReplacement::ShaderReplacementDisk> gLoadedShaderReplacements;
-	extern std::vector<std::vector<uint8_t>> gLoadedShaderReplacementBlobs;
-	extern int gSelectedShaderReplacementIndex;
-	extern int gShaderReplacementNameBufferIndex;
-	extern char gShaderReplacementNameBuffer[256];
-	extern bool gLoadedShaderReplacementsOnce;
+	extern std::vector<ShaderTarget::ShaderTargetDisk> gLoadedShaderTargets;
+	extern std::vector<std::vector<uint8_t>> gLoadedShaderTargetBlobs;
+	extern int gSelectedShaderTargetIndex;
+	extern int gShaderTargetNameBufferIndex;
+	extern char gShaderTargetNameBuffer[256];
+	extern bool gLoadedShaderTargetsOnce;
 	extern ShaderSelectionStyle gShaderSelectionStyle;
 
-	int FindEnabledShaderReplacement(uint64_t shaderHash, ShaderReplacement::ShaderType shaderType);
-	void MarkShaderReplacementApplyDirty();
+	int FindEnabledShaderTarget(uint64_t shaderHash, ShaderTarget::ShaderType shaderType);
+	void MarkShaderTargetApplyDirty();
 	void InvalidateAllReplacementPSOs();
 	void ResetUncapturedReplacementAttempts();
 	void ClearShaderMarkers();
@@ -191,31 +191,34 @@ namespace HookD3D12
 	void CaptureComputePipelineState(const D3D12_COMPUTE_PIPELINE_STATE_DESC* pipelineDescription, ID3D12PipelineState* pipelineState, bool shouldRegisterAsKnownPipeline);
 	void CapturePipelineStateStream(const D3D12_PIPELINE_STATE_STREAM_DESC* pipelineStreamDescription, ID3D12PipelineState* pipelineState);
 	bool GetRootSignatureBlob(ID3D12RootSignature* rootSignature, std::vector<uint8_t>& outBlob, uint64_t& outHash);
-	ID3D12RootSignature* GetOrCreatePersistedRootSignature(const ShaderReplacement::ShaderReplacementDisk& replacement, ID3D12Device* device);
+	ID3D12RootSignature* GetOrCreatePersistedRootSignature(const ShaderTarget::ShaderTargetDisk& replacement, ID3D12Device* device);
 	void ReleaseRootSignatureCache();
-	void RefreshLoadedShaderReplacements();
-	void SyncShaderReplacementNameBuffer();
-	bool SaveShaderReplacement(int index);
-	bool CompileShaderReplacement(int index);
-	bool ReloadShaderReplacement(int index);
-	bool DeleteShaderReplacement(int index);
-	bool CreateReplacementShaderTemplateForPipeline(
+	void RefreshLoadedShaderTargets();
+	void SyncShaderTargetNameBuffer();
+	bool SaveShaderTarget(int index);
+	bool CompileShaderTarget(int index);
+	bool ReloadShaderTarget(int index);
+	bool DeleteShaderTarget(int index);
+	bool CreateShaderTargetForPipeline(
 		const std::string& sourceList,
 		int pipelineIndex,
-		ShaderReplacement::ShaderType shaderType,
+		ShaderTarget::ShaderType shaderType,
 		uint64_t shaderHash,
 		size_t shaderBytecodeLength,
 		const void* shaderBytecode,
-		GraphicsPipelineInfo& pipeline);
-	bool CreateReplacementShaderTemplateForPipeline(
+		GraphicsPipelineInfo& pipeline,
+		const std::string& modifiedShaderId,
+		bool generateShaderDisassembly);
+	bool CreateShaderTargetForPipeline(
 		const std::string& sourceList,
 		int pipelineIndex,
-		ShaderReplacement::ShaderType shaderType,
+		ShaderTarget::ShaderType shaderType,
 		uint64_t shaderHash,
 		size_t shaderBytecodeLength,
 		const void* shaderBytecode,
-		PipelineStateInfo& pipeline);
-
+		PipelineStateInfo& pipeline,
+		const std::string& modifiedShaderId,
+		bool generateShaderDisassembly);
 
 	extern void Release();
 	bool IsInitialized();
