@@ -21,6 +21,16 @@ With that said this guide should help you every step of the way, the process is 
 
 Lets get to it!
 
+# Preface
+
+Just before we begin I need to start off by saying that some users have run into a number of issues during installation where their Anti-Virus would flag the ShaderInjector files and sometimes go as far as deleting them due to the false "severity" level. This should be improved in newer versions due to metadata and signing however keep an eye out just in case if you reach [Step 3](#step-3-boot-into-the-game) and the shader injector menu does not show up at all. 
+
+There is a chance your anti-virus is trying to fight it and it might have even deleted some of the shader injector files that you installed, all you need to do in that case is just disable your anti-virus and be sure to whitelist the files for the mod. Ensure that all files are still there before launching again. Windows Smart Control also could potentially block the game from running with the DLL so keep an eye out for that.
+
+[More details for solutions should you run into trouble can be found here.](https://github.com/frostbone25/ShaderInjector/blob/main/Solutions.md).
+
+Anyway Let's start!
+
 # Step 1: Delete Game Shader Cache
 
 **This step is a very important pre-requisite before installing the mod.** In order for the injector to work it needs to intercept the creation of game shaders to collect them so that they can be replaced later. It's simple enough to do...

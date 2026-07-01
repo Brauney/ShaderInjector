@@ -8,7 +8,6 @@ This document will occasionally be updated with more information collected from 
 - [Anti-Virus Shenanigans / False Positives](#anti-virus-shenanigans--false-positives)
 - [Shader Adjustments](#shader-configuration-tweaking)
 - [Vanishing Lights](#vanishing-lights)
-- [Flickering Shadows / Offset Shadows](#flickering-shadows--offset-shadows)
 - [Linux Support](#linux-support)
 - [Game Not Launching](#game-not-launching)
 
@@ -61,37 +60,6 @@ For users who are experiencing light sources "vanishing" in interior spaces, if 
 
 Unfortunately this is something that is out of my control as often light sources in the game are placed inside solid objects *(that have shadow casting disabled)*. The side effect is since the mod adds precise shadowing to local lights, those light sources that were visible before now end up appearing blocked because physically... its being blocked by geometry!
 
----
-
-#### Flickering Shadows / Offset Shadows
-
-<p float="left">
-    <img src="GithubContent/Solutions/shadow-flicker-on.jpg" width="49%" />
-    <img src="GithubContent/Solutions/shadow-flicker-off.jpg" width="49%" />
-</p>
-
-*Flickering Shadows*
-
-<p float="left">
-    <img src="GithubContent/Solutions/berdrok56-shifted-shadows.png" width="49%" />
-</p>
-
-*Offset Shadows*
-
-If you are experiencing some flickering within the distance, or your shadows appear correct but they seem "shifted" either to the left or to the right this is likely due to the fact that you have **Dynamic Resolution enabled within your game settings.** 
-
-There are a couple of ways to fix the issue. The first and simplest one is if you are using Dynamic Resolution it needs to be consistent. A quick fix is to set both your Minimum and Maximum to 50%.
-
-![](GithubContent/Solutions/dynamic-res-50.png)
-
-The other way to fix the issue is to disable Dynamic Resolution entirely setting both the Maximum and Minimum to 100%. 
-
-![](GithubContent/Solutions/dynamic-res-100.png)
-
-Now if you need the performance boost you can instead edit Engine.ini or use [FFVII Hook](https://www.nexusmods.com/finalfantasy7rebirth/mods/4) to natively render at a lower resolution instead using something like ```r.SetRes 1920x1080f```
-
----
-
 #### Linux Support
 
 Courtesy of [smackedwookiee](url=https://www.youtube.com/@SmackedWookiee)!
@@ -127,3 +95,38 @@ Value: dsound=n,b
 #### Game Not Launching
 
 Some uesrs have reported that when installing the ShaderInjector that the game wouldn't start. A user has reported that Windows' Smart App Control was blocking the dll from being used, and turning it off fixed it and allowed the game to run.
+
+---
+
+# Resolved Issues
+
+These are issues that are already resolved, but I am keeping them around just in-case there is are some users still running into issues that should have been resolved in future updates
+
+#### (FIXED IN 1.5.1+) Flickering Shadows / Offset Shadows
+
+<p float="left">
+    <img src="GithubContent/Solutions/shadow-flicker-on.jpg" width="49%" />
+    <img src="GithubContent/Solutions/shadow-flicker-off.jpg" width="49%" />
+</p>
+
+*Flickering Shadows*
+
+<p float="left">
+    <img src="GithubContent/Solutions/berdrok56-shifted-shadows.png" width="49%" />
+</p>
+
+*Offset Shadows*
+
+If you are experiencing some flickering within the distance, or your shadows appear correct but they seem "shifted" either to the left or to the right this is likely due to the fact that you have **Dynamic Resolution enabled within your game settings.** 
+
+There are a couple of ways to fix the issue. The first and simplest one is if you are using Dynamic Resolution it needs to be consistent. A quick fix is to set both your Minimum and Maximum to 50%.
+
+![](GithubContent/Solutions/dynamic-res-50.png)
+
+The other way to fix the issue is to disable Dynamic Resolution entirely setting both the Maximum and Minimum to 100%. 
+
+![](GithubContent/Solutions/dynamic-res-100.png)
+
+Now if you need the performance boost you can instead edit Engine.ini or use [FFVII Hook](https://www.nexusmods.com/finalfantasy7rebirth/mods/4) to natively render at a lower resolution instead using something like ```r.SetRes 1920x1080f```
+
+---
