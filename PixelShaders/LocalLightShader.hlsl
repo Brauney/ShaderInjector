@@ -111,16 +111,27 @@
 #define CONTACT_SHADOWS_THICKNESS 25.0
 
 //this is a small bias factor to minimize contact shadow acne on sloped surfaces
-//RANGE: this should be between [0.0 <---> 0.1]
-#define CONTACT_SHADOWS_BIAS 0.005
+//high values = reduced acne but can introduce visual issues where shadows appear less grounded
+//low values = potentially increased acne but keeps shadows grounded
+//RANGE: this should be between [0.0 <---> 5.0]
+//DEFAULT: 1.0
+#define CONTACT_SHADOWS_BIAS 1.0
 
 //this is a small bias factor to minimize contact shadow acne on sloped surfaces for hair specifically
-//RANGE: this should be between [0.0 <---> 0.1]
-#define CONTACT_SHADOWS_BIAS_HAIR 0.005
+//RANGE: this should be between [0.0 <---> 5.0]
+//high values = reduced acne but can introduce visual issues where shadows appear less grounded
+//low values = potentially increased acne but keeps shadows grounded
+//RANGE: this should be between [0.0 <---> 5.0]
+//DEFAULT: 1.5
+#define CONTACT_SHADOWS_BIAS_HAIR 1.5
 
 //this is a small bias factor to minimize contact shadow acne on sloped surfaces using surface normal
-//RANGE: this should be between [0.0 <---> 1.0]
-#define CONTACT_SHADOWS_NORMAL_BIAS 0.005
+//RANGE: this should be between [0.0 <---> 5.0]
+//high values = reduced acne but can introduce visual issues where shadows appear less grounded
+//low values = potentially increased acne but keeps shadows grounded
+//RANGE: this should be between [0.0 <---> 5.0]
+//DEFAULT: 0.5
+#define CONTACT_SHADOWS_NORMAL_BIAS 0.5
 
 //OPTIMIZATION: this avoids calculating contact shadows for sky pixels
 //has no effect visually, but can save you quite a bit of frametime especially the more you look up :P 
@@ -656,10 +667,11 @@ float InterleavedGradientNoise(float2 pixCoord, int frameCount)
 	return frac(magic.z * frac(dot(pixCoord, magic.xy)));
 }
 
+//128x128x64 R8G8B8A8
 float LoadSpatiotemporalBlueNoise(PSInput input)
 {
     #if defined(RANDOM_ANIMATE_NOISE)
-        int frameSlice = View_StateFrameIndex & 7;
+        int frameSlice = View_StateFrameIndex & 63;
     #else
         int frameSlice = 0;
     #endif
@@ -1088,13 +1100,27 @@ float CalculateContactShadows(FGBufferData gbufferData, FResolvedPixel resolvedP
 		float random = 1.0f;
 	#endif
 	
+    //approximation of how big a pixel is
+    //this is because at low resolutions biasing / noise issues get really bad
+    //but intrestingly at higher and higher resolutions the biasing/noise issues go away
+    //so this means that for the most part we should factor in the pixel scale of the render target
+    //for inv size, natrually lower resolutions will have a larger number (higher res lower)
+    //so we can use this to scale our set bias factor
+    float pixelSize = max(View_BufferSizeAndInvSize.z, View_BufferSizeAndInvSize.w);
+    pixelSize *= 100.0f; //this 100 is arbitrary
+
+    float contactShadowBias = pixelSize * CONTACT_SHADOWS_BIAS;
+
+    if(gbufferData.ShadingModelID == SHADINGMODELID_HAIR)
+		contactShadowBias = pixelSize * CONTACT_SHADOWS_BIAS_HAIR;
+
 	//FIX: apparently we use "pre" translation? seems like there is an extra necessary offset to get an accurate world position vector
     float3 worldPosition = resolvedPixel.WorldPosition + View_PreViewTranslation;
 
 	//apply normal bias to help mitigate self-shadowing issues
-	worldPosition += gbufferData.WorldNormal * CONTACT_SHADOWS_NORMAL_BIAS;
+    worldPosition += gbufferData.WorldNormal * (pixelSize * CONTACT_SHADOWS_NORMAL_BIAS);
 
-    float3 rayOrigin = worldPosition;
+    float3 rayOrigin = worldPosition + resolvedPixel.LightVector * contactShadowBias;
     float3 rayEnd    = rayOrigin + resolvedPixel.LightVector * CONTACT_SHADOWS_RAY_LENGTH;
 
 	//FIX: apparently we use translated world to clip, which supposedly is more accurate?
@@ -1113,16 +1139,13 @@ float CalculateContactShadows(FGBufferData gbufferData, FResolvedPixel resolvedP
 	// xy = scale (0.5, -0.5 on D3D), zw = bias (0.5, 0.5 + viewport offset + TAA jitter)
 	// if we don't we can (and have) end up in a case where due to some resolution mismatching
 	// contact shadows can have a lot of artifacts and seemingly appear "offset" or behind for some user graphics configs
-	float2 uvStart = mad(ndcStart.xy, View_ScreenPositionScaleBias.xy, View_ScreenPositionScaleBias.zw);
-	float2 uvEnd   = mad(ndcEnd.xy,   View_ScreenPositionScaleBias.xy, View_ScreenPositionScaleBias.zw);
+    //IMPORTANT NOTE 2: WATCH THAT SWIZZLE! it needs to be wz not zw... otherwise we get scaling issues at non standard resolutions
+	float2 uvStart = mad(ndcStart.xy, View_ScreenPositionScaleBias.xy, View_ScreenPositionScaleBias.wz);
+	float2 uvEnd   = mad(ndcEnd.xy,   View_ScreenPositionScaleBias.xy, View_ScreenPositionScaleBias.wz);
 	float2 uvStep  = (uvEnd - uvStart) * invSamples;
 	float2 uv      = mad(uvStep, random, uvStart);
 
 	float occlusion = 1.0f;
-	float contactShadowBias = CONTACT_SHADOWS_BIAS;
-
-	if(gbufferData.ShadingModelID == SHADINGMODELID_HAIR)
-		contactShadowBias = CONTACT_SHADOWS_BIAS_HAIR;
 
     [unroll]
     for (int i = 0; i < CONTACT_SHADOWS_SAMPLES; ++i)

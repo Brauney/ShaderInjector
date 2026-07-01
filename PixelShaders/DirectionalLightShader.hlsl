@@ -106,16 +106,27 @@
 #define CONTACT_SHADOWS_THICKNESS 0.325
 
 //this is a small bias factor to minimize contact shadow acne on sloped surfaces
-//RANGE: this should be between [0.0 <---> 0.1]
-#define CONTACT_SHADOWS_BIAS 0.0001
+//high values = reduced acne but can introduce visual issues where shadows appear less grounded
+//low values = potentially increased acne but keeps shadows grounded
+//RANGE: this should be between [0.0 <---> 5.0]
+//DEFAULT: 0.1
+#define CONTACT_SHADOWS_BIAS 0.1
 
 //this is a small bias factor to minimize contact shadow acne on sloped surfaces for hair specifically
-//RANGE: this should be between [0.0 <---> 0.1]
-#define CONTACT_SHADOWS_BIAS_HAIR 0.005
+//RANGE: this should be between [0.0 <---> 5.0]
+//high values = reduced acne but can introduce visual issues where shadows appear less grounded
+//low values = potentially increased acne but keeps shadows grounded
+//RANGE: this should be between [0.0 <---> 5.0]
+//DEFAULT: 0.1
+#define CONTACT_SHADOWS_BIAS_HAIR 0.1
 
 //this is a small bias factor to minimize contact shadow acne on sloped surfaces using surface normal
-//RANGE: this should be between [0.0 <---> 1.0]
-#define CONTACT_SHADOWS_NORMAL_BIAS 0.001
+//RANGE: this should be between [0.0 <---> 5.0]
+//high values = reduced acne but can introduce visual issues where shadows appear less grounded
+//low values = potentially increased acne but keeps shadows grounded
+//RANGE: this should be between [0.0 <---> 5.0]
+//DEFAULT: 0.1
+#define CONTACT_SHADOWS_NORMAL_BIAS 0.1
 
 //OPTIMIZATION: this avoids calculating contact shadows for sky pixels
 //has no effect visually, but can save you quite a bit of frametime especially the more you look up :P 
@@ -1129,9 +1140,24 @@ float FastContactShadowClipSpace(
 {
     const float invSamples = rcp((float)CONTACT_SHADOWS_SAMPLES);
 
-	worldPosition += worldNormal * CONTACT_SHADOWS_NORMAL_BIAS;
+    //approximation of how big a pixel is
+    //this is because at low resolutions biasing / noise issues get really bad
+    //but intrestingly at higher and higher resolutions the biasing/noise issues go away
+    //so this means that for the most part we should factor in the pixel scale of the render target
+    //for inv size, natrually lower resolutions will have a larger number (higher res lower)
+    //so we can use this to scale our set bias factor
+    float pixelSize = max(View_BufferSizeAndInvSize.z, View_BufferSizeAndInvSize.w);
+    pixelSize *= 100.0f; //this 100 is arbitrary
 
-    float3 rayOrigin = worldPosition + lightDirection * 1.0f;
+    float contactShadowBias = pixelSize * CONTACT_SHADOWS_BIAS;
+
+    if(shadingModelID == SHADINGMODELID_HAIR)
+		contactShadowBias = pixelSize * CONTACT_SHADOWS_BIAS_HAIR;
+
+	//apply normal bias to help mitigate self-shadowing issues
+    worldPosition += worldNormal * (pixelSize * CONTACT_SHADOWS_NORMAL_BIAS);
+
+    float3 rayOrigin = worldPosition + lightDirection * contactShadowBias;
     float3 rayEnd    = rayOrigin + lightDirection * CONTACT_SHADOWS_RAY_LENGTH;
 
     float4 clipStart = mul(View_WorldToClip, float4(rayOrigin, 1.0));
@@ -1149,16 +1175,14 @@ float FastContactShadowClipSpace(
 	// xy = scale (0.5, -0.5 on D3D), zw = bias (0.5, 0.5 + viewport offset + TAA jitter)
 	// if we don't we can (and have) end up in a case where due to some resolution mismatching
 	// contact shadows can have a lot of artifacts and seemingly appear "offset" or behind for some user graphics configs
-	float2 uvStart = mad(ndcStart.xy, View_ScreenPositionScaleBias.xy, View_ScreenPositionScaleBias.zw);
-	float2 uvEnd   = mad(ndcEnd.xy,   View_ScreenPositionScaleBias.xy, View_ScreenPositionScaleBias.zw);
+	//IMPORTANT NOTE 2: WATCH THAT SWIZZLE! it needs to be wz not zw... otherwise we get scaling issues at non standard resolutions
+	float2 uvStart = mad(ndcStart.xy, View_ScreenPositionScaleBias.xy, View_ScreenPositionScaleBias.wz);
+	float2 uvEnd   = mad(ndcEnd.xy,   View_ScreenPositionScaleBias.xy, View_ScreenPositionScaleBias.wz);
+
 	float2 uvStep  = (uvEnd - uvStart) * invSamples;
 	float2 uv      = mad(uvStep, random, uvStart);
 
 	float occlusion = 1.0f;
-	float contactShadowBias = CONTACT_SHADOWS_BIAS;
-
-	if(shadingModelID == SHADINGMODELID_HAIR)
-		contactShadowBias = CONTACT_SHADOWS_BIAS_HAIR;
 
     [unroll]
     for (int i = 0; i < CONTACT_SHADOWS_SAMPLES; ++i)
@@ -1777,15 +1801,15 @@ PSOutput main(PSInput input)
     //optimization: early out if we are too far from a light
     if (resolvedPixel.DistanceAttenuation <= 0.0)
     {
-        output.Color = float4(0, 0, 0, 0);
-        return output;
+        //output.Color = float4(0, 0, 0, 0);
+        //return output;
     }
 
     //optimization: early out if we are already in shadow (from the shadowmap)
     if (resolvedPixel.ShadowedLightAttenuation <= 0.0)
     {
-        output.Color = float4(0, 0, 0, 0);
-        return output;
+        //output.Color = float4(0, 0, 0, 0);
+        //return output;
     }
 
     FLightingTerms terms = ShadeMaterial(graphicsBuffer, resolvedPixel, light);
