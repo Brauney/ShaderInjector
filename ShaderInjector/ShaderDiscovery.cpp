@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <mutex>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -41,9 +42,11 @@ namespace ShaderDiscovery
 
 		std::unordered_map<ShaderKey, int, ShaderKeyHasher> gDiscoveredReplacementAliases;
 		std::unordered_set<ShaderKey, ShaderKeyHasher> gAttemptedCandidates;
-		std::unordered_map<ShaderKey, ShaderAnalysis::ShaderAnalysisDisk, ShaderKeyHasher> gCandidateAnalyses;
+		std::unordered_map<ShaderKey, ShaderAnalysis::ShaderAnalysisDisk, ShaderKeyHasher> gReplacementCandidateAnalyses;
+		std::unordered_map<ShaderKey, ShaderAnalysis::ShaderAnalysisDisk, ShaderKeyHasher> gModifiedCandidateAnalyses;
 		std::unordered_map<ShaderKey, std::string, ShaderKeyHasher> gDiscoveredModifiedShaders;
 		std::unordered_set<ShaderKey, ShaderKeyHasher> gAttemptedModifiedShaders;
+		std::mutex gModifiedDiscoveryMutex;
 
 		bool HasPlausibleByteLength(size_t candidateLength, const ShaderTarget::ShaderTargetDisk& replacement)
 		{
@@ -73,9 +76,13 @@ namespace ShaderDiscovery
 	{
 		gDiscoveredReplacementAliases.clear();
 		gAttemptedCandidates.clear();
-		gCandidateAnalyses.clear();
-		gDiscoveredModifiedShaders.clear();
-		gAttemptedModifiedShaders.clear();
+		gReplacementCandidateAnalyses.clear();
+		{
+			std::lock_guard<std::mutex> lock(gModifiedDiscoveryMutex);
+			gModifiedCandidateAnalyses.clear();
+			gDiscoveredModifiedShaders.clear();
+			gAttemptedModifiedShaders.clear();
+		}
 	}
 
 	bool EnsureReplacementAnalysis(ShaderTarget::ShaderTargetDisk& replacement)
@@ -171,15 +178,15 @@ namespace ShaderDiscovery
 		}
 
 		ShaderAnalysis::ShaderAnalysisDisk candidateAnalysis{};
-		const auto cachedAnalysis = gCandidateAnalyses.find(candidateKey);
-		if (cachedAnalysis != gCandidateAnalyses.end())
+		const auto cachedAnalysis = gReplacementCandidateAnalyses.find(candidateKey);
+		if (cachedAnalysis != gReplacementCandidateAnalyses.end())
 		{
 			candidateAnalysis = cachedAnalysis->second;
 		}
 		else
 		{
 			ShaderAnalyzer::Analyze(shaderBytecode.data(), shaderBytecode.size(), candidateAnalysis);
-			gCandidateAnalyses.emplace(candidateKey, candidateAnalysis);
+			gReplacementCandidateAnalyses.emplace(candidateKey, candidateAnalysis);
 		}
 
 		if (!HasStrictCrossVersionIdentity(candidateAnalysis))
@@ -233,6 +240,7 @@ namespace ShaderDiscovery
 		const std::vector<uint8_t>& shaderBytecode,
 		const std::vector<ModifiedShader::PackageDisk>& modifiedShaders)
 	{
+		std::lock_guard<std::mutex> lock(gModifiedDiscoveryMutex);
 		if (shaderHash == 0 || shaderBytecode.empty())
 			return -1;
 
@@ -314,13 +322,13 @@ namespace ShaderDiscovery
 
 #if SHADER_INJECTOR_DISCOVERY_MATCH_MODIFIED_SHADER_BY_ANALYSIS
 		ShaderAnalysis::ShaderAnalysisDisk candidateAnalysis{};
-		const auto cachedAnalysis = gCandidateAnalyses.find(candidateKey);
-		if (cachedAnalysis != gCandidateAnalyses.end())
+		const auto cachedAnalysis = gModifiedCandidateAnalyses.find(candidateKey);
+		if (cachedAnalysis != gModifiedCandidateAnalyses.end())
 			candidateAnalysis = cachedAnalysis->second;
 		else
 		{
 			ShaderAnalyzer::Analyze(shaderBytecode.data(), shaderBytecode.size(), candidateAnalysis);
-			gCandidateAnalyses.emplace(candidateKey, candidateAnalysis);
+			gModifiedCandidateAnalyses.emplace(candidateKey, candidateAnalysis);
 		}
 
 		if (candidateAnalysis.succeeded)

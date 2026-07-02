@@ -199,6 +199,8 @@ namespace HookD3D12
 	bool CompileShaderTarget(int index);
 	bool ReloadShaderTarget(int index);
 	bool DeleteShaderTarget(int index);
+	bool IsShaderTargetEffectivelyEnabled(const ShaderTarget::ShaderTargetDisk& replacement);
+	void RefreshShaderTargetsForModifiedShaderStateChange();
 	bool CreateShaderTargetForPipeline(
 		const std::string& sourceList,
 		int pipelineIndex,

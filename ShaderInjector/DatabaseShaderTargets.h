@@ -9,6 +9,8 @@ namespace HookD3D12
 	bool ReloadShaderTarget(int replacementIndex);
 	bool SaveShaderTarget(int replacementIndex);
 	bool DeleteShaderTarget(int replacementIndex);
+	bool IsShaderTargetEffectivelyEnabled(const ShaderTarget::ShaderTargetDisk& replacement);
+	void RefreshShaderTargetsForModifiedShaderStateChange();
 
 	void RefreshLoadedShaderTargets();
 

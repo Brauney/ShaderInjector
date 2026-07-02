@@ -2,6 +2,17 @@
 
 namespace ShaderInjectorGUI
 {
+	static const char* noteModifiedShadersText =
+"Modified shaders are packages with modified HLSL source code shaders. "
+"These packages also contain important data used during automatic shader discovery. "
+"Based on the loaded modified shaders the injector will use the data when catching PSOs to find shaders that match the signature of what the modified shader is trying to 'modify'. "
+"Once a match is found, a shader target is created automatically that uses the modified shader bytecode. "
+"NOTE: For shader targets to get found and created automatically, your game shader cache must be cleared/deleted). ";
+
+	static const char* noteShaderTargetsText =
+"Shader targets essentially are the endpoints to the PSOs that actually get modified in your game. "
+"These packages get created automatically during shader discovery. ";
+
 	static const char* noteDeveloperSettingsText =
 "Shaders/PSOs can only be caught during shader compilation, which can be achieved by deleting the game shader cache. "
 "During shader compilation this is where we catch new shaders being built. "

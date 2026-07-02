@@ -802,6 +802,8 @@ namespace HookD3D12
 			return false;
 
 		ShaderTarget::ShaderTargetDisk& replacement = gLoadedShaderTargets[replacementIndex];
+		if (!IsShaderTargetEffectivelyEnabled(replacement))
+			return false;
 
 		if (replacementIndex >= (int)gLoadedShaderTargetBlobs.size())
 			gLoadedShaderTargetBlobs.resize(gLoadedShaderTargets.size());
@@ -1238,7 +1240,7 @@ namespace HookD3D12
 				int cachedHashCount = 0;
 				for (const auto& replacement : gLoadedShaderTargets)
 				{
-					if (!replacement.enabled)
+					if (!IsShaderTargetEffectivelyEnabled(replacement))
 						continue;
 
 					enabledCount++;
@@ -2166,6 +2168,7 @@ namespace HookD3D12
 		//ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12->Release: Releasing resources and hooks.");
 
 		gShutdown = true;
+		ShaderAutomaticDiscovery::Shutdown();
 		ResetOverlayStartupGate();
 
 		if (Globals::mainWindow)

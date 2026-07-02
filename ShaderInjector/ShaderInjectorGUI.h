@@ -95,6 +95,7 @@ namespace ShaderInjectorGUI
 	void WriteToRuntimeLogSuccess(std::string text);
 	void WriteToRuntimeLogWarning(std::string text);
 	void ClearRuntimeLog();
+	std::string GetRuntimeLogSnapshot();
 
 	//===================== style =====================
 	void UI_ApplyStyle();

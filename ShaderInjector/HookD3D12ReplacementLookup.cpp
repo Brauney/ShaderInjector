@@ -6,6 +6,7 @@
 
 //custom
 #include "Hash.h"
+#include "DatabaseShaderTargets.h"
 #include "HookD3D12ReplacementTemplates.h"
 #include "ShaderDiscovery.h"
 #include "ShaderInjectorIO.h"
@@ -309,7 +310,7 @@ namespace HookD3D12
 		{
 			const ShaderTarget::ShaderTargetDisk& replacement = gLoadedShaderTargets[i];
 
-			if (!replacement.enabled)
+			if (!IsShaderTargetEffectivelyEnabled(replacement))
 				continue;
 
 			if (ReplacementHasCachedBlobHash(replacement, cachedBlobHash))
@@ -336,7 +337,7 @@ namespace HookD3D12
 		for (int replacementIndex = 0; replacementIndex < static_cast<int>(gLoadedShaderTargets.size()); ++replacementIndex)
 		{
 			const ShaderTarget::ShaderTargetDisk& replacement = gLoadedShaderTargets[replacementIndex];
-			if (!replacement.enabled)
+			if (!IsShaderTargetEffectivelyEnabled(replacement))
 				continue;
 
 			const CachedBlobContentMatch match = BestCachedBlobContentMatch(replacement, cachedBlob);
@@ -420,7 +421,7 @@ namespace HookD3D12
 		{
 			const ShaderTarget::ShaderTargetDisk& replacement = gLoadedShaderTargets[i];
 
-			if (!replacement.enabled || replacement.shaderType != shaderType)
+			if (!IsShaderTargetEffectivelyEnabled(replacement) || replacement.shaderType != shaderType)
 				continue;
 
 			if (Hash::ParseHashText(replacement.originalShaderBytecodeHash) == shaderHash)
@@ -453,6 +454,9 @@ namespace HookD3D12
 			return -1;
 
 		ShaderTarget::ShaderTargetDisk& replacement = gLoadedShaderTargets[discoveredReplacementIndex];
+		if (!IsShaderTargetEffectivelyEnabled(replacement))
+			return -1;
+
 		ShaderDiscovery::PersistShaderHashAlias(replacement, shaderHash);
 		if (streamPipeline)
 			PersistStreamPipelineTemplatesForShaderAlias(replacement, shaderType, shaderHash);

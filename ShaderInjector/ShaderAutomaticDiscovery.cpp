@@ -1,7 +1,11 @@
 #include "ShaderAutomaticDiscovery.h"
 
 #include <deque>
+#include <condition_variable>
+#include <memory>
 #include <mutex>
+#include <thread>
+#include <unordered_map>
 #include <unordered_set>
 #include <wrl/client.h>
 
@@ -18,6 +22,7 @@ namespace ShaderAutomaticDiscovery
 	namespace
 	{
 		constexpr size_t maximumQueuedShaders = 8192;
+		constexpr size_t maximumPendingAnalyses = 64;
 
 		struct ShaderKey
 		{
@@ -53,11 +58,31 @@ namespace ShaderAutomaticDiscovery
 			std::vector<uint8_t> shaderBytecode;
 		};
 
+		struct AnalysisJob
+		{
+			QueuedShader queuedShader;
+			std::shared_ptr<const std::vector<ModifiedShader::PackageDisk>> modifiedShaders;
+		};
+
+		struct AnalysisResult
+		{
+			QueuedShader queuedShader;
+			std::string modifiedShaderId;
+		};
+
 		std::mutex gQueueMutex;
 		std::deque<QueuedShader> gQueuedShaders;
+		std::deque<AnalysisJob> gAnalysisJobs;
+		std::deque<AnalysisResult> gAnalysisResults;
 		std::unordered_set<ShaderKey, ShaderKeyHasher> gSubmittedShaders;
-		std::unordered_set<ShaderKey, ShaderKeyHasher> gDirectMatchShaders;
+		std::unordered_map<ShaderKey, std::string, ShaderKeyHasher> gDirectMatchShaders;
+		std::shared_ptr<const std::vector<ModifiedShader::PackageDisk>> gModifiedShaderAnalysisSnapshot;
 		bool gCompatibleShaderTypes[static_cast<size_t>(ShaderTarget::Unknown) + 1]{};
+		std::condition_variable gAnalysisCondition;
+		std::thread* gAnalysisWorker = nullptr;
+		bool gAnalysisWorkerRunning = false;
+		bool gAnalysisStopRequested = false;
+		bool gAcceptingWork = true;
 
 		bool TargetContainsHash(const ShaderTarget::ShaderTargetDisk& target, uint64_t shaderHash)
 		{
@@ -101,13 +126,18 @@ namespace ShaderAutomaticDiscovery
 
 			const ShaderKey key{ shaderHash, shaderType };
 			std::lock_guard<std::mutex> lock(gQueueMutex);
+			if (!gAcceptingWork)
+				return false;
+
 			const size_t shaderTypeIndex = static_cast<size_t>(shaderType);
 			if (shaderTypeIndex >= static_cast<size_t>(ShaderTarget::Unknown) ||
 				!gCompatibleShaderTypes[shaderTypeIndex])
 			{
 				return true;
 			}
-			const bool directMatch = gDirectMatchShaders.find(key) != gDirectMatchShaders.end();
+			const auto directMatchIterator = gDirectMatchShaders.find(key);
+			const bool directMatch = directMatchIterator != gDirectMatchShaders.end() &&
+				!directMatchIterator->second.empty();
 			if (!force && !gSubmittedShaders.insert(key).second)
 				return true;
 			if (force)
@@ -205,19 +235,8 @@ namespace ShaderAutomaticDiscovery
 			return true;
 		}
 
-		void ProcessQueuedShader(QueuedShader& queued)
+		void ProcessMatchedShader(QueuedShader& queued, const std::string& modifiedShaderId)
 		{
-			DatabaseModifiedShaders::EnsureModifiedShadersLoaded();
-			const std::vector<ModifiedShader::PackageDisk>& modifiedShaders = DatabaseModifiedShaders::GetModifiedShaders();
-			const int modifiedShaderIndex = ShaderDiscovery::DiscoverEnabledModifiedShader(
-				queued.key.hash,
-				queued.key.type,
-				queued.shaderBytecode,
-				modifiedShaders);
-			if (modifiedShaderIndex < 0 || modifiedShaderIndex >= static_cast<int>(modifiedShaders.size()))
-				return;
-
-			const std::string modifiedShaderId = modifiedShaders[modifiedShaderIndex].id;
 			if (!HookD3D12::gLoadedShaderTargetsOnce)
 				HookD3D12::RefreshLoadedShaderTargets();
 
@@ -283,11 +302,95 @@ namespace ShaderAutomaticDiscovery
 				}
 			}
 		}
+
+		void AnalysisWorkerMain()
+		{
+			SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
+			const HRESULT comInitializationResult = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+
+			for (;;)
+			{
+				AnalysisJob job{};
+				{
+					std::unique_lock<std::mutex> lock(gQueueMutex);
+					gAnalysisCondition.wait(lock, []
+					{
+						return gAnalysisStopRequested || !gAnalysisJobs.empty();
+					});
+
+					if (gAnalysisStopRequested && gAnalysisJobs.empty())
+						break;
+
+					job = std::move(gAnalysisJobs.front());
+					gAnalysisJobs.pop_front();
+				}
+
+				try
+				{
+					const int modifiedShaderIndex = ShaderDiscovery::DiscoverEnabledModifiedShader(
+						job.queuedShader.key.hash,
+						job.queuedShader.key.type,
+						job.queuedShader.shaderBytecode,
+						*job.modifiedShaders);
+					if (modifiedShaderIndex < 0 || modifiedShaderIndex >= static_cast<int>(job.modifiedShaders->size()))
+						continue;
+
+					AnalysisResult result{};
+					result.queuedShader = std::move(job.queuedShader);
+					result.modifiedShaderId = (*job.modifiedShaders)[modifiedShaderIndex].id;
+					{
+						std::lock_guard<std::mutex> lock(gQueueMutex);
+						gAnalysisResults.push_back(std::move(result));
+					}
+				}
+				catch (...)
+				{
+					ShaderInjectorGUI::WriteToRuntimeLogError(
+						"ShaderAutomaticDiscovery: background shader analysis failed unexpectedly");
+				}
+			}
+
+			if (SUCCEEDED(comInitializationResult))
+				CoUninitialize();
+
+			std::lock_guard<std::mutex> lock(gQueueMutex);
+			gAnalysisWorkerRunning = false;
+		}
+
+		void EnsureAnalysisWorkerStartedLocked()
+		{
+			if (gAnalysisWorkerRunning)
+				return;
+
+			gAnalysisStopRequested = false;
+			gAnalysisWorkerRunning = true;
+			gAnalysisWorker = new std::thread(AnalysisWorkerMain);
+		}
+
+		bool TrySubmitAnalysis(QueuedShader& queued)
+		{
+			std::lock_guard<std::mutex> lock(gQueueMutex);
+			if (gAnalysisJobs.size() >= maximumPendingAnalyses || !gModifiedShaderAnalysisSnapshot)
+				return false;
+
+			EnsureAnalysisWorkerStartedLocked();
+			AnalysisJob job{};
+			job.queuedShader = std::move(queued);
+			job.modifiedShaders = gModifiedShaderAnalysisSnapshot;
+			gAnalysisJobs.push_back(std::move(job));
+			gAnalysisCondition.notify_one();
+			return true;
+		}
 	}
 
 	void RefreshModifiedShaderIndex(const std::vector<ModifiedShader::PackageDisk>& modifiedShaders)
 	{
+		auto analysisSnapshot = std::make_shared<std::vector<ModifiedShader::PackageDisk>>(modifiedShaders);
+		for (ModifiedShader::PackageDisk& modifiedShader : *analysisSnapshot)
+			modifiedShader.compiledBlob.clear();
+
 		std::lock_guard<std::mutex> lock(gQueueMutex);
+		gModifiedShaderAnalysisSnapshot = std::move(analysisSnapshot);
 		gDirectMatchShaders.clear();
 		for (bool& compatibleShaderType : gCompatibleShaderTypes)
 			compatibleShaderType = false;
@@ -308,7 +411,12 @@ namespace ShaderAutomaticDiscovery
 				{
 					const uint64_t parsedHash = Hash::ParseHashText(knownHash);
 					if (parsedHash != 0)
-						gDirectMatchShaders.insert(ShaderKey{ parsedHash, modifiedShader.shaderType });
+					{
+						const ShaderKey key{ parsedHash, modifiedShader.shaderType };
+						auto [directMatch, inserted] = gDirectMatchShaders.emplace(key, modifiedShader.id);
+						if (!inserted && directMatch->second != modifiedShader.id)
+							directMatch->second.clear();
+					}
 				}
 			}
 		}
@@ -316,18 +424,87 @@ namespace ShaderAutomaticDiscovery
 
 	void ProcessQueuedWork(size_t maximumJobs)
 	{
+		{
+			std::lock_guard<std::mutex> lock(gQueueMutex);
+			if (!gAcceptingWork)
+				return;
+		}
+
+		// D3D12-facing completion work remains on the render thread.
 		for (size_t processedJobs = 0; processedJobs < maximumJobs; ++processedJobs)
 		{
+			AnalysisResult result{};
+			{
+				std::lock_guard<std::mutex> lock(gQueueMutex);
+				if (gAnalysisResults.empty())
+					break;
+				result = std::move(gAnalysisResults.front());
+				gAnalysisResults.pop_front();
+			}
+			ProcessMatchedShader(result.queuedShader, result.modifiedShaderId);
+		}
+
+		// Submit a bounded amount of new work each frame. The worker processes jobs serially.
+		for (size_t submittedJobs = 0; submittedJobs < maximumJobs; ++submittedJobs)
+		{
 			QueuedShader queued{};
+			std::string directModifiedShaderId;
 			{
 				std::lock_guard<std::mutex> lock(gQueueMutex);
 				if (gQueuedShaders.empty())
-					return;
+					break;
+
 				queued = std::move(gQueuedShaders.front());
 				gQueuedShaders.pop_front();
+				const auto directMatch = gDirectMatchShaders.find(queued.key);
+				if (directMatch != gDirectMatchShaders.end())
+					directModifiedShaderId = directMatch->second;
 			}
 
-			ProcessQueuedShader(queued);
+			if (!directModifiedShaderId.empty())
+			{
+				ProcessMatchedShader(queued, directModifiedShaderId);
+				continue;
+			}
+
+			if (!TrySubmitAnalysis(queued))
+			{
+				std::lock_guard<std::mutex> lock(gQueueMutex);
+				gQueuedShaders.push_front(std::move(queued));
+				break;
+			}
+		}
+	}
+
+	void Shutdown()
+	{
+		std::thread* worker = nullptr;
+		{
+			std::lock_guard<std::mutex> lock(gQueueMutex);
+			gAcceptingWork = false;
+			gQueuedShaders.clear();
+			gAnalysisJobs.clear();
+			gAnalysisResults.clear();
+			gSubmittedShaders.clear();
+			gDirectMatchShaders.clear();
+			gModifiedShaderAnalysisSnapshot.reset();
+
+			if (!gAnalysisWorker)
+				return;
+
+			gAnalysisStopRequested = true;
+			worker = gAnalysisWorker;
+			gAnalysisCondition.notify_all();
+		}
+
+		if (worker->joinable())
+			worker->join();
+
+		{
+			std::lock_guard<std::mutex> lock(gQueueMutex);
+			delete gAnalysisWorker;
+			gAnalysisWorker = nullptr;
+			gAnalysisWorkerRunning = false;
 		}
 	}
 

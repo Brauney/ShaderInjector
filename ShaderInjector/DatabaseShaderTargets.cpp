@@ -26,6 +26,30 @@ namespace HookD3D12
 	char gShaderTargetNameBuffer[256]{};
 	bool gLoadedShaderTargetsOnce = false;
 
+	bool IsShaderTargetEffectivelyEnabled(const ShaderTarget::ShaderTargetDisk& replacement)
+	{
+		if (!replacement.enabled || replacement.modifiedShaderId.empty())
+			return false;
+
+		const ModifiedShader::PackageDisk* modifiedShader =
+			DatabaseModifiedShaders::FindModifiedShaderById(replacement.modifiedShaderId);
+		return modifiedShader && modifiedShader->enabled &&
+			modifiedShader->shaderType == replacement.shaderType;
+	}
+
+	void RefreshShaderTargetsForModifiedShaderStateChange()
+	{
+		// Existing replacement PSOs were built from the previous effective state.
+		// Retire them before reloading linked blobs so the next apply pass either
+		// rebuilds from the enabled package or falls back to the original game PSO.
+		{
+			std::lock_guard<std::mutex> lock(gPipelineMutex);
+			InvalidateAllReplacementPSOs();
+		}
+
+		RefreshLoadedShaderTargets();
+	}
+
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| COMPILE SHADER REPLACEMENT |||||||||||||||||||||||||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| COMPILE SHADER REPLACEMENT |||||||||||||||||||||||||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| COMPILE SHADER REPLACEMENT |||||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -101,7 +125,7 @@ namespace HookD3D12
 
 		std::vector<uint8_t> compiledReplacementBlob;
 
-		if (modifiedShader)
+		if (modifiedShader && IsShaderTargetEffectivelyEnabled(replacement))
 			compiledReplacementBlob = modifiedShader->compiledBlob;
 
 		if (!modifiedShader || compiledReplacementBlob.empty())
@@ -233,7 +257,7 @@ namespace HookD3D12
 				const ModifiedShader::PackageDisk* modifiedShader =
 					DatabaseModifiedShaders::FindModifiedShaderById(replacement.modifiedShaderId);
 				replacement.modifiedShaderBlobPath = modifiedShader ? modifiedShader->compiledBlobPath : "";
-				if (modifiedShader && modifiedShader->enabled)
+				if (modifiedShader && IsShaderTargetEffectivelyEnabled(replacement))
 					compiledReplacementBlob = modifiedShader->compiledBlob;
 
 				gLoadedShaderTargets.push_back(replacement);

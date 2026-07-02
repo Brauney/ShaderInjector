@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <limits>
+#include <mutex>
 #include <regex>
 #include <sstream>
 #include <string>
@@ -21,18 +22,9 @@ namespace ShaderAnalyzer
 	{
 		using Microsoft::WRL::ComPtr;
 
-		class LoadedModule
-		{
-		public:
-			~LoadedModule()
-			{
-				if (module && ownsModule)
-					FreeLibrary(module);
-			}
-
-			HMODULE module = nullptr;
-			bool ownsModule = false;
-		};
+		std::mutex gAnalyzerMutex;
+		std::mutex gDXCompilerModuleMutex;
+		HMODULE gDXCompilerModule = nullptr;
 
 		std::string SafeString(const char* text)
 		{
@@ -99,26 +91,36 @@ namespace ShaderAnalyzer
 			}
 		}
 
-		bool LoadDXCompiler(LoadedModule& loadedModule)
+		HMODULE LoadDXCompiler()
 		{
-			loadedModule.module = GetModuleHandleW(L"dxcompiler.dll");
-			if (loadedModule.module)
-				return true;
+			std::lock_guard<std::mutex> lock(gDXCompilerModuleMutex);
+			if (gDXCompilerModule)
+				return gDXCompilerModule;
+
+			// Pin a copy already loaded by the game so another component cannot unload it
+			// while the background analyzer is using DXC interfaces from that module.
+			if (GetModuleHandleExW(
+				GET_MODULE_HANDLE_EX_FLAG_PIN,
+				L"dxcompiler.dll",
+				&gDXCompilerModule))
+			{
+				return gDXCompilerModule;
+			}
 
 			const std::wstring configuredPath = Utf8ToWide(ShaderInjectorIO::GetToolPathDXCompiler());
 			if (!configuredPath.empty())
 			{
-				loadedModule.module = LoadLibraryExW(
+				gDXCompilerModule = LoadLibraryExW(
 					configuredPath.c_str(),
 					nullptr,
 					LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
 			}
 
-			if (!loadedModule.module)
-				loadedModule.module = LoadLibraryW(L"dxcompiler.dll");
+			if (!gDXCompilerModule)
+				gDXCompilerModule = LoadLibraryW(L"dxcompiler.dll");
 
-			loadedModule.ownsModule = loadedModule.module != nullptr;
-			return loadedModule.module != nullptr;
+			// Intentionally retain this module reference for the injector's lifetime.
+			return gDXCompilerModule;
 		}
 
 		ShaderAnalysis::SignatureParameterDisk ReadSignatureParameter(const D3D12_SIGNATURE_PARAMETER_DESC& description)
@@ -380,17 +382,21 @@ namespace ShaderAnalyzer
 
 	bool Analyze(const void* bytecode, size_t bytecodeLength, ShaderAnalysis::ShaderAnalysisDisk& outAnalysis)
 	{
+		// DXC may also be used by template creation and cached-PSO discovery on game
+		// threads. Keep all reflection/disassembly work single-file across the process.
+		std::lock_guard<std::mutex> analyzerLock(gAnalyzerMutex);
+
 		outAnalysis = {};
 		if (!bytecode || bytecodeLength == 0)
 			return Fail(outAnalysis, "Shader bytecode is empty.");
 		if (bytecodeLength > (std::numeric_limits<uint32_t>::max)())
 			return Fail(outAnalysis, "Shader bytecode exceeds the DXC blob size limit.");
 
-		LoadedModule dxCompiler;
-		if (!LoadDXCompiler(dxCompiler))
+		const HMODULE dxCompilerModule = LoadDXCompiler();
+		if (!dxCompilerModule)
 			return Fail(outAnalysis, "dxcompiler.dll could not be loaded from ShaderInjector/Tools or the process DLL search path.");
 
-		const auto createInstance = reinterpret_cast<DxcCreateInstanceProc>(GetProcAddress(dxCompiler.module, "DxcCreateInstance"));
+		const auto createInstance = reinterpret_cast<DxcCreateInstanceProc>(GetProcAddress(dxCompilerModule, "DxcCreateInstance"));
 		if (!createInstance)
 			return Fail(outAnalysis, "dxcompiler.dll does not export DxcCreateInstance.");
 

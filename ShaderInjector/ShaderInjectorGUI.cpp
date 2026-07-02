@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <string>
+#include <mutex>
 #include <vector>
 
 //3RD Party
@@ -27,6 +28,7 @@ namespace ShaderInjectorGUI
 {
 	static const float indentSpace = 16.0f;
 	std::string runtimeLogText;
+	static std::mutex gRuntimeLogMutex;
 	static bool injectorDeveloperSettings = false;
 	static int gSelectionStyleIndex = (int)HookD3D12::ShaderSelectionStyle::BluePixelShader;
 	static std::string gSelectedModifiedShaderId;
@@ -73,7 +75,10 @@ namespace ShaderInjectorGUI
 					ClearRuntimeLog();
 
 				if (context.runtimeLogText)
-					ImGui::TextUnformatted(context.runtimeLogText->c_str());
+				{
+					const std::string runtimeLogSnapshot = GetRuntimeLogSnapshot();
+					ImGui::TextUnformatted(runtimeLogSnapshot.c_str());
+				}
 
 				ImGui::TreePop();
 			}
@@ -101,6 +106,14 @@ namespace ShaderInjectorGUI
 		{
 			ImGui::Indent(indentSpace);
 			ImGui::Spacing();
+
+			ImGui::InputTextMultiline("##ModifiedShadersNote",
+				const_cast<char*>(noteModifiedShadersText),
+				strlen(noteModifiedShadersText) + 1,
+				ImVec2(-FLT_MIN, 0), // -FLT_MIN width = stretch to window edge, 0 height = auto
+				ImGuiInputTextFlags_ReadOnly | ImGuiInputTextFlags_WordWrap
+			);
+
 			DatabaseModifiedShaders::EnsureModifiedShadersLoaded();
 			if (!HookD3D12::gLoadedShaderTargetsOnce)
 				HookD3D12::RefreshLoadedShaderTargets();
@@ -219,6 +232,8 @@ namespace ShaderInjectorGUI
 			{
 				if (!DatabaseModifiedShaders::SetModifiedShaderEnabled(gSelectedModifiedShaderId, enabled))
 					WriteToRuntimeLogError("Failed to save Modified Shader enabled state.");
+				else
+					HookD3D12::RefreshShaderTargetsForModifiedShaderStateChange();
 				selectedModifiedShader = DatabaseModifiedShaders::FindModifiedShaderById(gSelectedModifiedShaderId);
 			}
 			if (!selectedModifiedShader)
@@ -334,6 +349,13 @@ namespace ShaderInjectorGUI
 		{
 			ImGui::Indent(indentSpace);
 			ImGui::Spacing();
+
+			ImGui::InputTextMultiline("##ShaderTargetsNote",
+				const_cast<char*>(noteShaderTargetsText),
+				strlen(noteShaderTargetsText) + 1,
+				ImVec2(-FLT_MIN, 0), // -FLT_MIN width = stretch to window edge, 0 height = auto
+				ImGuiInputTextFlags_ReadOnly | ImGuiInputTextFlags_WordWrap
+			);
 
 			if (!HookD3D12::gLoadedShaderTargetsOnce)
 				HookD3D12::RefreshLoadedShaderTargets();
@@ -600,7 +622,7 @@ namespace ShaderInjectorGUI
 	template<typename PipelineT>
 	bool PipelineUsesReplacement(const PipelineT& pipeline, const ShaderTarget::ShaderTargetDisk& replacement)
 	{
-		if (!replacement.enabled || !pipeline.psoWithReplacement)
+		if (!HookD3D12::IsShaderTargetEffectivelyEnabled(replacement) || !pipeline.psoWithReplacement)
 			return false;
 
 		return pipeline.activeShaderTargetType == replacement.shaderType
@@ -1042,8 +1064,11 @@ namespace ShaderInjectorGUI
 
 	void WriteToRuntimeLog(std::string text)
 	{
-		runtimeLogText += "\n";
-		runtimeLogText += text;
+		{
+			std::lock_guard<std::mutex> lock(gRuntimeLogMutex);
+			runtimeLogText += "\n";
+			runtimeLogText += text;
+		}
 		ShaderInjectorIO::WriteToLogFile(text);
 	}
 
@@ -1064,7 +1089,14 @@ namespace ShaderInjectorGUI
 
 	void ClearRuntimeLog()
 	{
+		std::lock_guard<std::mutex> lock(gRuntimeLogMutex);
 		runtimeLogText = "";
+	}
+
+	std::string GetRuntimeLogSnapshot()
+	{
+		std::lock_guard<std::mutex> lock(gRuntimeLogMutex);
+		return runtimeLogText;
 	}
 
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| STYLE |||||||||||||||||||||||||||||||||||||||||||||||||||||

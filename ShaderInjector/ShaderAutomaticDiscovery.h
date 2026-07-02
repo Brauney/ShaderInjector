@@ -18,6 +18,7 @@ namespace ShaderAutomaticDiscovery
 	// Capture hooks only enqueue unique shaders. The render path drains a small,
 	// bounded amount of work so shader analysis cannot stall PSO creation threads.
 	void ProcessQueuedWork(size_t maximumJobs = 1);
+	void Shutdown();
 	void RefreshModifiedShaderIndex(const std::vector<ModifiedShader::PackageDisk>& modifiedShaders);
 	void ProcessCapturedGraphicsPipeline(const HookD3D12::GraphicsPipelineInfo& pipeline);
 	void ProcessCapturedStreamPipeline(const HookD3D12::PipelineStateInfo& pipeline);
