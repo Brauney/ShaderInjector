@@ -16,7 +16,7 @@ namespace HookD3D12
 	void InstallPipelineHooksForDevice(ID3D12Device* device);
 	void InstallCommandListHooksForCommandList(ID3D12GraphicsCommandList* commandList);
 
-	enum class ShaderSelectionStyle
+	enum class PixelShaderSelectionStyle
 	{
 		BluePixelShader = 0,
 		Hidden = 1,
@@ -50,11 +50,20 @@ namespace HookD3D12
 	{
 		ID3D12PipelineState* pipelineState = nullptr;
 
-		uint64_t vsHash = 0; SIZE_T vsSize = 0;
-		uint64_t psHash = 0; SIZE_T psSize = 0;
-		uint64_t gsHash = 0; SIZE_T gsSize = 0;
-		uint64_t hsHash = 0; SIZE_T hsSize = 0;
-		uint64_t dsHash = 0; SIZE_T dsSize = 0;
+		uint64_t vsHash = 0; 
+		SIZE_T vsSize = 0;
+
+		uint64_t psHash = 0; 
+		SIZE_T psSize = 0;
+
+		uint64_t gsHash = 0; 
+		SIZE_T gsSize = 0;
+
+		uint64_t hsHash = 0; 
+		SIZE_T hsSize = 0;
+
+		uint64_t dsHash = 0; 
+		SIZE_T dsSize = 0;
 
 		std::vector<uint8_t> vsBytecode;
 		std::vector<uint8_t> psBytecode;
@@ -179,7 +188,7 @@ namespace HookD3D12
 	extern int gShaderTargetNameBufferIndex;
 	extern char gShaderTargetNameBuffer[256];
 	extern bool gLoadedShaderTargetsOnce;
-	extern ShaderSelectionStyle gShaderSelectionStyle;
+	extern PixelShaderSelectionStyle gShaderSelectionStyle;
 
 	int FindEnabledShaderTarget(uint64_t shaderHash, ShaderTarget::ShaderType shaderType);
 	void MarkShaderTargetApplyDirty();

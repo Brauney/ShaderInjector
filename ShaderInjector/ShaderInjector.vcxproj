@@ -80,7 +80,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;SHADERINJECTOR_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-	  <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
@@ -98,7 +98,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;SHADERINJECTOR_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-	  <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
@@ -116,7 +116,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;SHADERINJECTOR_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-	  <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
@@ -134,7 +134,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;SHADERINJECTOR_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-	  <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>PreCompiledHeader.h</PrecompiledHeaderFile>
       <AdditionalIncludeDirectories>$(ProjectDir)Resources;$(ProjectDir)ExternalDependencies\json\nlohmann;$(ProjectDir)ExternalDependencies\imgui-1.92.8;$(ProjectDir)ExternalDependencies\imgui-1.92.8\backends;$(ProjectDir)ExternalDependencies\MinHook_134\include;$(ProjectDir)ExternalDependencies\inifile-cpp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -149,11 +149,15 @@
       <ModuleDefinitionFile>$(ProjectDir)exports.def</ModuleDefinitionFile>
       <AdditionalDependencies>d3d12.lib;dxgi.lib;$(ProjectDir)ExternalDependencies\MinHook_134\lib\libMinHook.x64.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PostBuildEvent>
+      <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)Build\FinalizeRelease.ps1" -TargetPath "$(TargetPath)"</Command>
+      <Message>Finalizing Shader Injector release artifact</Message>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="FPSCounter.h" />
     <ClInclude Include="DatabaseShaderTargets.h" />
-	<ClInclude Include="DatabaseModifiedShaders.h" />
+    <ClInclude Include="DatabaseModifiedShaders.h" />
     <ClInclude Include="DatabaseGraphicsPSOs.h" />
     <ClInclude Include="Hash.h" />
     <ClInclude Include="HookD3D12.h" />
@@ -177,14 +181,15 @@
     <ClInclude Include="dsound_proxy.h" />
     <ClInclude Include="Keycodes.h" />
     <ClInclude Include="ProcessRunner.h" />
-	<ClInclude Include="ShaderAnalysis.h" />
-	<ClInclude Include="ShaderAnalyzer.h" />
-	<ClInclude Include="ShaderDiscovery.h" />
-	<ClInclude Include="ShaderAutomaticDiscovery.h" />
-	<ClInclude Include="ModifiedShader.h" />
-	<ClInclude Include="ModifiedShaderCreation.h" />
-	<ClInclude Include="SimilarityScore.h" />
-	<ClInclude Include="ShaderInjectorVersion.h" />
+    <ClInclude Include="resource.h" />
+    <ClInclude Include="ShaderAnalysis.h" />
+    <ClInclude Include="ShaderAnalyzer.h" />
+    <ClInclude Include="ShaderDiscovery.h" />
+    <ClInclude Include="ShaderAutomaticDiscovery.h" />
+    <ClInclude Include="ModifiedShader.h" />
+    <ClInclude Include="ModifiedShaderCreation.h" />
+    <ClInclude Include="SimilarityScore.h" />
+    <ClInclude Include="ShaderInjectorVersion.h" />
     <ClInclude Include="ShaderInjectorGUITooltips.h" />
     <ClInclude Include="ShaderInjectorIO.h" />
     <ClInclude Include="ShaderInjectorSettings.h" />
@@ -198,7 +203,7 @@
   <ItemGroup>
     <ClCompile Include="FPSCounter.cpp" />
     <ClCompile Include="DatabaseShaderTargets.cpp" />
-	<ClCompile Include="DatabaseModifiedShaders.cpp" />
+    <ClCompile Include="DatabaseModifiedShaders.cpp" />
     <ClCompile Include="DatabaseGraphicsPSOs.cpp" />
     <ClCompile Include="Hash.cpp" />
     <ClCompile Include="HookD3D12.cpp" />
@@ -224,20 +229,26 @@
     <ClCompile Include="HookInput.cpp" />
     <ClCompile Include="dsound_proxy.cpp" />
     <ClCompile Include="Keycodes.cpp" />
-	<ClCompile Include="ProcessRunner.cpp" />
-	<ClCompile Include="ShaderAnalyzer.cpp" />
-	<ClCompile Include="ShaderAnalysis.cpp" />
-	<ClCompile Include="ShaderDiscovery.cpp" />
-	<ClCompile Include="ShaderAutomaticDiscovery.cpp" />
-	<ClCompile Include="ModifiedShader.cpp" />
-	<ClCompile Include="ModifiedShaderCreation.cpp" />
+    <ClCompile Include="ProcessRunner.cpp" />
+    <ClCompile Include="ShaderAnalyzer.cpp" />
+    <ClCompile Include="ShaderAnalysis.cpp" />
+    <ClCompile Include="ShaderDiscovery.cpp" />
+    <ClCompile Include="ShaderAutomaticDiscovery.cpp" />
+    <ClCompile Include="ModifiedShader.cpp" />
+    <ClCompile Include="ModifiedShaderCreation.cpp" />
     <ClCompile Include="ShaderInjectorIO.cpp" />
     <ClCompile Include="DatabaseStreamPSOs.cpp" />
     <ClCompile Include="ShaderTarget.cpp" />
-	<ClCompile Include="ShaderTargetSimilarity.cpp" />
+    <ClCompile Include="ShaderTargetSimilarity.cpp" />
     <ClCompile Include="ShaderTemplates.cpp" />
     <ClCompile Include="ShaderInjectorGUI.cpp" />
     <ClCompile Include="StringHelper.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="ShaderInjector.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Build\FinalizeRelease.ps1" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

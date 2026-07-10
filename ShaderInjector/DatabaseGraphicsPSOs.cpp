@@ -11,11 +11,7 @@
 namespace HookD3D12
 {
 	std::vector<GraphicsPipelineInfo> gGraphicsPipelines;
-
-	namespace
-	{
-		std::vector<ComputePipelineInfo> gComputePipelines;
-	}
+	std::vector<ComputePipelineInfo> gComputePipelines;
 
 	void CaptureGraphicsPipelineState(const D3D12_GRAPHICS_PIPELINE_STATE_DESC* pipelineDescription, ID3D12PipelineState* pipelineState)
 	{
@@ -25,37 +21,38 @@ namespace HookD3D12
 		GraphicsPipelineInfo capturedPipeline{};
 		capturedPipeline.pipelineState = pipelineState;
 
-		// Copy every shader bytecode blob that exists on the original graphics PSO.
-		// The D3D12 desc points into caller-owned memory, so replacement rebuilds must use our durable copies.
-		if (pipelineDescription->VS.pShaderBytecode && pipelineDescription->VS.BytecodeLength)
+		//copy every shader bytecode blob that exists on the original graphics PSO.
+		//the D3D12 desc points into caller-owned memory, so replacement rebuilds must use our durable copies.
+
+		if (pipelineDescription->VS.pShaderBytecode && pipelineDescription->VS.BytecodeLength) //VERTEX SHADER
 		{
 			capturedPipeline.vsHash = Hash::HashMemory(pipelineDescription->VS.pShaderBytecode, pipelineDescription->VS.BytecodeLength);
 			capturedPipeline.vsSize = pipelineDescription->VS.BytecodeLength;
 			capturedPipeline.vsBytecode.assign((const uint8_t*)pipelineDescription->VS.pShaderBytecode, (const uint8_t*)pipelineDescription->VS.pShaderBytecode + pipelineDescription->VS.BytecodeLength);
 		}
 
-		if (pipelineDescription->PS.pShaderBytecode && pipelineDescription->PS.BytecodeLength)
+		if (pipelineDescription->PS.pShaderBytecode && pipelineDescription->PS.BytecodeLength) //PIXEL SHADER
 		{
 			capturedPipeline.psHash = Hash::HashMemory(pipelineDescription->PS.pShaderBytecode, pipelineDescription->PS.BytecodeLength);
 			capturedPipeline.psSize = pipelineDescription->PS.BytecodeLength;
 			capturedPipeline.psBytecode.assign((const uint8_t*)pipelineDescription->PS.pShaderBytecode, (const uint8_t*)pipelineDescription->PS.pShaderBytecode + pipelineDescription->PS.BytecodeLength);
 		}
 
-		if (pipelineDescription->GS.pShaderBytecode && pipelineDescription->GS.BytecodeLength)
+		if (pipelineDescription->GS.pShaderBytecode && pipelineDescription->GS.BytecodeLength) //GEOMETRY SHADER
 		{
 			capturedPipeline.gsHash = Hash::HashMemory(pipelineDescription->GS.pShaderBytecode, pipelineDescription->GS.BytecodeLength);
 			capturedPipeline.gsSize = pipelineDescription->GS.BytecodeLength;
 			capturedPipeline.gsBytecode.assign((const uint8_t*)pipelineDescription->GS.pShaderBytecode, (const uint8_t*)pipelineDescription->GS.pShaderBytecode + pipelineDescription->GS.BytecodeLength);
 		}
 
-		if (pipelineDescription->HS.pShaderBytecode && pipelineDescription->HS.BytecodeLength)
+		if (pipelineDescription->HS.pShaderBytecode && pipelineDescription->HS.BytecodeLength) //HULL SHADER
 		{
 			capturedPipeline.hsHash = Hash::HashMemory(pipelineDescription->HS.pShaderBytecode, pipelineDescription->HS.BytecodeLength);
 			capturedPipeline.hsSize = pipelineDescription->HS.BytecodeLength;
 			capturedPipeline.hsBytecode.assign((const uint8_t*)pipelineDescription->HS.pShaderBytecode, (const uint8_t*)pipelineDescription->HS.pShaderBytecode + pipelineDescription->HS.BytecodeLength);
 		}
 
-		if (pipelineDescription->DS.pShaderBytecode && pipelineDescription->DS.BytecodeLength)
+		if (pipelineDescription->DS.pShaderBytecode && pipelineDescription->DS.BytecodeLength) //DOMAIN SHADER
 		{
 			capturedPipeline.dsHash = Hash::HashMemory(pipelineDescription->DS.pShaderBytecode, pipelineDescription->DS.BytecodeLength);
 			capturedPipeline.dsSize = pipelineDescription->DS.BytecodeLength;

@@ -2,6 +2,10 @@
 
 namespace ShaderInjectorGUI
 {
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| UI - MODIFIED SHADERS |||||||||||||||||||||||||||||||||||||||||||||||||||||
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| UI - MODIFIED SHADERS |||||||||||||||||||||||||||||||||||||||||||||||||||||
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| UI - MODIFIED SHADERS |||||||||||||||||||||||||||||||||||||||||||||||||||||
+
 	static const char* noteModifiedShadersText =
 "Modified shaders are packages with modified HLSL source code shaders. "
 "These packages also contain important data used during automatic shader discovery. "
@@ -9,9 +13,26 @@ namespace ShaderInjectorGUI
 "Once a match is found, a shader target is created automatically that uses the modified shader bytecode. "
 "NOTE: For shader targets to get found and created automatically, your game shader cache must be cleared/deleted). ";
 
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| UI - SHADER TARGETS |||||||||||||||||||||||||||||||||||||||||||||||||||||
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| UI - SHADER TARGETS |||||||||||||||||||||||||||||||||||||||||||||||||||||
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| UI - SHADER TARGETS |||||||||||||||||||||||||||||||||||||||||||||||||||||
+
 	static const char* noteShaderTargetsText =
 "Shader targets essentially are the endpoints to the PSOs that actually get modified in your game. "
 "These packages get created automatically during shader discovery. ";
+
+	static const char* tooltipRefreshShaderTargets =
+		"Refreshes the view in the 'ShaderInjector/ShaderTargets' folder for shader targets that you created. ";
+
+	static const char* tooltipEnableShaderTarget =
+		"Enable/disables the currently selected shader replacement. ";
+
+	static const char* tooltipDeleteShaderTarget =
+		"Deletes the currently selected shader replacement (NO UNDO!)";
+
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| UI - DEVELOPER SETTINGS |||||||||||||||||||||||||||||||||||||||||||||||||||||
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| UI - DEVELOPER SETTINGS |||||||||||||||||||||||||||||||||||||||||||||||||||||
+	//||||||||||||||||||||||||||||||||||||||||||||||||||||| UI - DEVELOPER SETTINGS |||||||||||||||||||||||||||||||||||||||||||||||||||||
 
 	static const char* noteDeveloperSettingsText =
 "Shaders/PSOs can only be caught during shader compilation, which can be achieved by deleting the game shader cache. "
@@ -23,15 +44,6 @@ namespace ShaderInjectorGUI
 "Shader replacements should remain persistent even after shader cache deletions and multiple launches, the only time they become invalid is if the hash bytecode changes. "
 "\n"
 "\n PLEASE READ DOCUMENTATION FOR MORE DETAILS OR HELP!!!";
-
-	static const char* tooltipRefreshShaderTargets = 
-"Refreshes the view in the 'ShaderInjector/ShaderTargets' folder for shader targets that you created. ";
-
-	static const char* tooltipEnableShaderTarget =
-"Enable/disables the currently selected shader replacement. ";
-
-	static const char* tooltipDeleteShaderTarget =
-"Deletes the currently selected shader replacement (NO UNDO!)";
 
 	static const char* tooltipModifiedShaderCombobox =
 "Selects a compatible ModifiedShader package from 'ShaderInjector/ModifiedShaders'.";

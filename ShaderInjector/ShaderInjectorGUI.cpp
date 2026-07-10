@@ -23,14 +23,18 @@
 #include "StringHelper.h"
 #include "ShaderInjectorGUITooltips.h"
 #include "Keycodes.h"
+#include "ShaderInjectorVersion.h"
 
 namespace ShaderInjectorGUI
 {
 	static const float indentSpace = 16.0f;
+
 	std::string runtimeLogText;
 	static std::mutex gRuntimeLogMutex;
+
 	static bool injectorDeveloperSettings = false;
-	static int gSelectionStyleIndex = (int)HookD3D12::ShaderSelectionStyle::BluePixelShader;
+
+	static int gSelectionStyleIndex = (int)HookD3D12::PixelShaderSelectionStyle::BluePixelShader;
 	static std::string gSelectedModifiedShaderId;
 	static std::string gModifiedShaderNameBufferId;
 	static char gModifiedShaderNameBuffer[256]{};
@@ -49,26 +53,32 @@ namespace ShaderInjectorGUI
 		ImGui::SetNextWindowPos(ImVec2(25, 25), ImGuiCond_FirstUseEver);
 		UI_ApplyStyle();
 
-		if (ImGui::Begin("Shader Injector", context.showWindow, flags))
+		std::string windowTitle = std::string("Shader Injector v") + SHADER_INJECTOR_VERSION_STRING;
+
+		//shader injector window start
+		if (ImGui::Begin(windowTitle.c_str(), context.showWindow, flags))
 		{
+			//injector enable checkbox
 			ImGui::Checkbox("##InjectorEnabled", &Globals::gShaderInjectorEnabled);
 			ImGui::SameLine();
 			ImGui::Text("Injector %s", context.injectorEnabled ? "Enabled!" : "Disabled!");
 
+			//fps counter
 			if (context.fpsCounterActive)
 				ImGui::Text("FPS: %.1f (%.4fms)", context.fps, context.frameTimeMs);
 
+			//additional help text
 			ImGui::Text("Toggle Injector: Press %s", Keycodes::KeycodeToString(Globals::keyToggleShaderInjector) + " (" + std::to_string(Globals::keyToggleShaderInjector) + ")");
 			ImGui::Text("Toggle Menu: Press %s", Keycodes::KeycodeToString(Globals::keyOpenShaderInjectorGUI) + " (" + std::to_string(Globals::keyOpenShaderInjectorGUI) + ")");
-
 			ImGui::Spacing();
 
+			//set in HookD3D12, wires up an event that calls UI_ShaderInjectorMenu()
 			if (context.drawMenu)
 				context.drawMenu();
 
+			//log section
 			ImGui::BeginGroup();
 			ImGui::SeparatorText("Log");
-
 			if (ImGui::TreeNodeEx("Runtime Log"))
 			{
 				if (ImGui::Button("Clear Log"))
@@ -82,9 +92,8 @@ namespace ShaderInjectorGUI
 
 				ImGui::TreePop();
 			}
-
 			ImGui::EndGroup();
-		}
+		} //window end
 
 		ImGui::End();
 	}
@@ -243,16 +252,6 @@ namespace ShaderInjectorGUI
 				return;
 			}
 			ImGui::SameLine();
-			if (ImGui::Button("Open Folder##ModifiedShaderSelected") && !ShaderInjectorIO::OpenDirectory(selectedModifiedShader->packageDirectory))
-			{
-				WriteToRuntimeLogError("Could not open Modified Shader package folder: " + selectedModifiedShader->packageDirectory);
-			}
-
-			ImGui::SameLine();
-			if (ImGui::Button("Delete##ModifiedShader"))
-				ImGui::OpenPopup("Delete Modified Shader?");
-
-			ImGui::SameLine();
 			if (ImGui::Button("Recompile##ModifiedShaders"))
 			{
 				int linkedReplacementCount = 0;
@@ -281,6 +280,15 @@ namespace ShaderInjectorGUI
 						WriteToRuntimeLogError("Reloaded " + std::to_string(successfulReplacementCount) + " of " + std::to_string(linkedReplacementCount) + " linked replacements.");
 				}
 			}
+			ImGui::SameLine();
+			if (ImGui::Button("Open Folder##ModifiedShaderSelected") && !ShaderInjectorIO::OpenDirectory(selectedModifiedShader->packageDirectory))
+			{
+				WriteToRuntimeLogError("Could not open Modified Shader package folder: " + selectedModifiedShader->packageDirectory);
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Delete##ModifiedShader"))
+				ImGui::OpenPopup("Delete Modified Shader?");
+
 
 			bool deletedModifiedShader = false;
 			if (ImGui::BeginPopupModal("Delete Modified Shader?", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
@@ -670,7 +678,7 @@ namespace ShaderInjectorGUI
 
 			if (ImGui::Combo("##SelectionStyle", &gSelectionStyleIndex, selectionStyles, IM_ARRAYSIZE(selectionStyles)))
 			{
-				HookD3D12::gShaderSelectionStyle = (HookD3D12::ShaderSelectionStyle)gSelectionStyleIndex;
+				HookD3D12::gShaderSelectionStyle = (HookD3D12::PixelShaderSelectionStyle)gSelectionStyleIndex;
 				HookD3D12::ClearShaderMarkers();
 				HookD3D12::InvalidateShaderMarkerPSOs();
 			}
@@ -788,7 +796,7 @@ namespace ShaderInjectorGUI
 				"Pixel Shaders", "StreamPS", "Stream", HookD3D12::gPipelineStates, ShaderTarget::PixelShader, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PS, HookD3D12::PSOPendingRebuild::SourceList::Stream, true, false, &HookD3D12::PipelineStateInfo::psDisabled, &HookD3D12::PipelineStateInfo::psoWithoutPS);
 
 			UI_ShaderStageList<HookD3D12::PipelineStateInfo, &HookD3D12::PipelineStateInfo::csHash, &HookD3D12::PipelineStateInfo::csSize, &HookD3D12::PipelineStateInfo::csBytecode>(
-				"Compute Shaders", "StreamCS", "Stream", HookD3D12::gPipelineStates, ShaderTarget::ComputeShader, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_CS, HookD3D12::PSOPendingRebuild::SourceList::Stream, true, true, &HookD3D12::PipelineStateInfo::csDisabled, &HookD3D12::PipelineStateInfo::psoWithoutCS);
+				"Compute Shaders", "StreamCS", "Stream", HookD3D12::gPipelineStates, ShaderTarget::ComputeShader, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_CS, HookD3D12::PSOPendingRebuild::SourceList::Stream, true, false, &HookD3D12::PipelineStateInfo::csDisabled, &HookD3D12::PipelineStateInfo::psoWithoutCS);
 
 			UI_ShaderStageList<HookD3D12::PipelineStateInfo, &HookD3D12::PipelineStateInfo::vsHash, &HookD3D12::PipelineStateInfo::vsSize, &HookD3D12::PipelineStateInfo::vsBytecode>(
 				"Vertex Shaders", "StreamVS", "Stream", HookD3D12::gPipelineStates, ShaderTarget::VertexShader, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_VS, HookD3D12::PSOPendingRebuild::SourceList::Stream, true, true, &HookD3D12::PipelineStateInfo::vsDisabled, &HookD3D12::PipelineStateInfo::psoWithoutVS);
@@ -912,9 +920,9 @@ namespace ShaderInjectorGUI
 				{
 					selectedIndex = sortedIndex;
 
-					const HookD3D12::ShaderSelectionStyle selectionStyle = (HookD3D12::ShaderSelectionStyle)gSelectionStyleIndex;
+					const HookD3D12::PixelShaderSelectionStyle selectionStyle = (HookD3D12::PixelShaderSelectionStyle)gSelectionStyleIndex;
 
-					if (selectionStyle == HookD3D12::ShaderSelectionStyle::None)
+					if (selectionStyle == HookD3D12::PixelShaderSelectionStyle::None)
 					{
 						HookD3D12::ClearShaderMarkers();
 					}
@@ -971,7 +979,7 @@ namespace ShaderInjectorGUI
 		{
 			ImGui::Text("Marker: %s", pipeline.*disabledMember ? "active" : "inactive");
 
-			if ((HookD3D12::ShaderSelectionStyle)gSelectionStyleIndex == HookD3D12::ShaderSelectionStyle::None)
+			if ((HookD3D12::PixelShaderSelectionStyle)gSelectionStyleIndex == HookD3D12::PixelShaderSelectionStyle::None)
 				ImGui::Text("Selection Style is None.");
 		}
 

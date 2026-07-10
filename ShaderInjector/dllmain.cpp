@@ -32,11 +32,13 @@ static DWORD WINAPI OnAttachDLL(LPVOID)
 	//||||||||||||||||||||||||||||||| INITALIZE IO |||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||| INITALIZE IO |||||||||||||||||||||||||||||||
 
-	// Preserve the previous run before starting a fresh current log.
+	//preserve the previous run before starting a fresh current log
 	ShaderInjectorIO::RotateLogFiles();
 
 	//initalize IO operations (folders, files, internal shader files)
 	ShaderInjectorIO::Initialize();
+
+	//collect modified shaders stored in "ShaderInjector/ModifiedShaders"
 	DatabaseModifiedShaders::RefreshModifiedShaders();
 
 	//IMPORTANT NOTE 2: We are able to create and run this thread, so this does execute and work!
@@ -44,59 +46,75 @@ static DWORD WINAPI OnAttachDLL(LPVOID)
 	//NOTE 2: because this is on a seperate thread, popping a message box will not freeze the application!
 	ShaderInjectorIO::WriteToLogFile("dllmain->OnAttachDLL: dsound thread initalized!");
 
-	//||||||||||||||||||||||||||||||| SHADER |||||||||||||||||||||||||||||||
-	//||||||||||||||||||||||||||||||| SHADER |||||||||||||||||||||||||||||||
-	//||||||||||||||||||||||||||||||| SHADER |||||||||||||||||||||||||||||||
-	//here we are preparing our "internal" shader resources to be used by the injector.
-	//these are shaders that we use for various things, marking, error showing, etc.
-	//I prefer at this point in time to just rewrite the shaders based off a code template in the codebase
+	//||||||||||||||||||||||||||||||| NULL PIXEL SHADER |||||||||||||||||||||||||||||||
+	//||||||||||||||||||||||||||||||| NULL PIXEL SHADER |||||||||||||||||||||||||||||||
+	//||||||||||||||||||||||||||||||| NULL PIXEL SHADER |||||||||||||||||||||||||||||||
+	//prepare our "internal" shader resources for an error pixel shader (red)
+	//NOTE: I prefer at this point in time to just rewrite the shaders based off a code template in the codebase
 	//then compile them right at the start, that way we start fresh, just in case the users for whatever reason tamper with them (or move/delete them)
 
 	ShaderInjectorIO::WriteToLogFile("dllmain->OnAttachDLL: getting null shader...");
 
-	std::string nullShaderPath = ShaderInjectorIO::GetInternalNullPixelShaderSourceCodeFilePath();
-	std::string nullShaderBlobPath = ShaderInjectorIO::GetInternalNullPixelShaderBlobFilePath();
+	//collect source and blob path
+	std::string errorPixelShaderPath = ShaderInjectorIO::GetInternalNullPixelShaderSourceCodeFilePath();
+	std::string errorPixelShaderBlobPath = ShaderInjectorIO::GetInternalNullPixelShaderBlobFilePath();
 
-	bool nullShaderCompiled = ShaderInjectorIO::CompileSourceToDXILBlob(
-		nullShaderPath, //NOTE: this NEEDS to be an .hlsl source shader text file
+	//compile "error" pixel shader
+	bool nullPixelShaderCompiled = ShaderInjectorIO::CompileSourceToDXILBlob(
+		errorPixelShaderPath, //NOTE: this NEEDS to be an .hlsl source shader text file
 		"ps_6_6", //target profile, for rebirth ps_6_6 is what I found in renderdoc
 		"main", //name of the function within the shader to execute
-		nullShaderBlobPath); //output blob file path
+		errorPixelShaderBlobPath); //output blob file path
 
-	if (nullShaderCompiled)
+	if (nullPixelShaderCompiled)
 	{
 		//NOTE: 'nullShaderBlobPath' this NEEDS to be a DXIL compiled binary file
 		//'Globals::nullPixelShaderBlob' array to contain the data in memory
-		bool nullShaderLoaded = ShaderInjectorIO::LoadDXILBlobFromDisk(nullShaderBlobPath, Globals::nullPixelShaderBlob);
+		bool nullShaderLoaded = ShaderInjectorIO::LoadDXILBlobFromDisk(errorPixelShaderBlobPath, Globals::nullPixelShaderBlob);
 
 		if (!nullShaderLoaded || Globals::nullPixelShaderBlob.empty())
 		{
 			Globals::nullPixelShaderBlob.clear();
-			ShaderInjectorIO::WriteToLogFileError("dllmain->OnAttachDLL: failed to load null pixel shader blob: " + nullShaderBlobPath);
+			ShaderInjectorIO::WriteToLogFileError("dllmain->OnAttachDLL: failed to load null pixel shader blob: " + errorPixelShaderBlobPath);
 		}
 	}
 	else
 	{
 		Globals::nullPixelShaderBlob.clear();
-		ShaderInjectorIO::WriteToLogFileError("dllmain->OnAttachDLL: failed to compile null pixel shader: " + nullShaderPath);
+		ShaderInjectorIO::WriteToLogFileError("dllmain->OnAttachDLL: failed to compile null pixel shader: " + errorPixelShaderPath);
 	}
 
 	ShaderInjectorIO::WriteToLogFile("dllmain->OnAttachDLL: globals::nullPixelShaderBlob size " + std::to_string(Globals::nullPixelShaderBlob.size()));
 
-	bool markerPixelLoaded = ShaderInjectorIO::LoadDXILBlobFromDisk(ShaderInjectorIO::GetInternalMarkerPixelShaderBlobFilePath(), Globals::markerPixelShaderBlob);
+	//||||||||||||||||||||||||||||||| SELECTION MARKER PIXEL SHADER |||||||||||||||||||||||||||||||
+	//||||||||||||||||||||||||||||||| SELECTION MARKER PIXEL SHADER |||||||||||||||||||||||||||||||
+	//||||||||||||||||||||||||||||||| SELECTION MARKER PIXEL SHADER |||||||||||||||||||||||||||||||
+	//prepare our "internal" shader resources for a marker pixel shader (blue)
+	//NOTE: I prefer at this point in time to just rewrite the shaders based off a code template in the codebase
+	//then compile them right at the start, that way we start fresh, just in case the users for whatever reason tamper with them (or move/delete them)
+
+	std::string markerPixelShaderBlobPath = ShaderInjectorIO::GetInternalMarkerPixelShaderBlobFilePath();
+
+	bool markerPixelLoaded = ShaderInjectorIO::LoadDXILBlobFromDisk(markerPixelShaderBlobPath, Globals::markerPixelShaderBlob);
 
 	if (!markerPixelLoaded || Globals::markerPixelShaderBlob.empty())
 	{
 		Globals::markerPixelShaderBlob.clear();
-		ShaderInjectorIO::WriteToLogFileError("dllmain->OnAttachDLL: failed to load marker pixel shader blob: " + ShaderInjectorIO::GetInternalMarkerPixelShaderBlobFilePath());
+		ShaderInjectorIO::WriteToLogFileError("dllmain->OnAttachDLL: failed to load marker pixel shader blob: " + markerPixelShaderBlobPath);
 	}
 
-	bool markerComputeLoaded = ShaderInjectorIO::LoadDXILBlobFromDisk(ShaderInjectorIO::GetInternalMarkerComputeShaderBlobFilePath(), Globals::markerComputeShaderBlob);
+	//||||||||||||||||||||||||||||||| SELECTION MARKER COMPUTE SHADER |||||||||||||||||||||||||||||||
+	//||||||||||||||||||||||||||||||| SELECTION MARKER COMPUTE SHADER |||||||||||||||||||||||||||||||
+	//||||||||||||||||||||||||||||||| SELECTION MARKER COMPUTE SHADER |||||||||||||||||||||||||||||||
+
+	std::string markerComputeShaderBlobPath = ShaderInjectorIO::GetInternalMarkerComputeShaderBlobFilePath();
+
+	bool markerComputeLoaded = ShaderInjectorIO::LoadDXILBlobFromDisk(markerComputeShaderBlobPath, Globals::markerComputeShaderBlob);
 
 	if (!markerComputeLoaded || Globals::markerComputeShaderBlob.empty())
 	{
 		Globals::markerComputeShaderBlob.clear();
-		ShaderInjectorIO::WriteToLogFileError("dllmain->OnAttachDLL: failed to load marker compute shader blob: " + ShaderInjectorIO::GetInternalMarkerComputeShaderBlobFilePath());
+		ShaderInjectorIO::WriteToLogFileError("dllmain->OnAttachDLL: failed to load marker compute shader blob: " + markerComputeShaderBlobPath);
 	}
 
 	ShaderInjectorIO::WriteToLogFile("dllmain->OnAttachDLL: globals::markerPixelShaderBlob size " + std::to_string(Globals::markerPixelShaderBlob.size()));
@@ -106,13 +124,13 @@ static DWORD WINAPI OnAttachDLL(LPVOID)
 	//||||||||||||||||||||||||||||||| INITALIZE MINHOOK |||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||| INITALIZE MINHOOK |||||||||||||||||||||||||||||||
 
-	MH_STATUS status = MH_Initialize();
+	MH_STATUS minhookStatus = MH_Initialize();
 
-	if (status != MH_OK)
+	if (minhookStatus != MH_OK)
 	{
-		char buffer[256];
-		sprintf_s(buffer, "dllmain->OnAttachDLL: MH_Initialize failed: %s", MH_StatusToString(status));
-		ShaderInjectorIO::WriteToLogFileError(buffer);
+		char stringBuffer[256];
+		sprintf_s(stringBuffer, "dllmain->OnAttachDLL: MH_Initialize failed: %s", MH_StatusToString(minhookStatus));
+		ShaderInjectorIO::WriteToLogFileError(stringBuffer);
 		return 0;
 	}
 
@@ -135,15 +153,17 @@ static DWORD WINAPI OnAttachDLL(LPVOID)
 
 	//IMPORTANT NOTE 4: We can infact find the d3d12.dll and get a handle on it!
 	//NOTE: keep this comment around for sanity check please!
-	char buffer[256];
-	sprintf_s(buffer, "dllmain->OnAttachDLL: d3d12.dll = %p", d3d12);
-	ShaderInjectorIO::WriteToLogFile(buffer);
+	char stringBuffer[256];
+	sprintf_s(stringBuffer, "dllmain->OnAttachDLL: d3d12.dll = %p", d3d12);
+	ShaderInjectorIO::WriteToLogFile(stringBuffer);
 
 	//this is where the real madness begins...
 	//hook into d3d12 device creation and start hooking into many of it's calls
 	HookD3D12::InstallD3D12CreateDeviceHook(d3d12);
 
 	Hooks::Initialize();
+
+	//log to make sure we're done hooking!
 	ShaderInjectorIO::WriteToLogFile("dllmain->OnAttachDLL: hook initialization complete.");
 
 	return 0;

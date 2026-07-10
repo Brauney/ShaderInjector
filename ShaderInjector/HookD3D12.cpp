@@ -103,7 +103,7 @@ namespace HookD3D12
 
 	static bool gShaderTargetApplyDirty = true;
 	static bool gPipelineStateOverridesDirty = true;
-	ShaderSelectionStyle gShaderSelectionStyle = ShaderSelectionStyle::BluePixelShader;
+	PixelShaderSelectionStyle gShaderSelectionStyle = PixelShaderSelectionStyle::BluePixelShader;
 
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| CREATE DEVICE |||||||||||||||||||||||||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| CREATE DEVICE |||||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -563,7 +563,7 @@ namespace HookD3D12
 		if (outPSO || p.streamBlob.empty() || !device)
 			return;
 
-		const bool hiddenSelection = gShaderSelectionStyle == ShaderSelectionStyle::Hidden;
+		const bool hiddenSelection = gShaderSelectionStyle == PixelShaderSelectionStyle::Hidden;
 
 		if (!hiddenSelection && targetType == D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PS && Globals::markerPixelShaderBlob.empty() && Globals::nullPixelShaderBlob.empty())
 		{
@@ -1404,7 +1404,7 @@ namespace HookD3D12
 					D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = p.originalDesc;
 					desc.VS = { p.vsBytecode.empty() ? nullptr : p.vsBytecode.data(), p.vsBytecode.size() };
 
-					const bool hiddenSelection = gShaderSelectionStyle == ShaderSelectionStyle::Hidden;
+					const bool hiddenSelection = gShaderSelectionStyle == PixelShaderSelectionStyle::Hidden;
 					const std::vector<uint8_t>& markerBlob = !Globals::markerPixelShaderBlob.empty() ? Globals::markerPixelShaderBlob : Globals::nullPixelShaderBlob;
 					desc.PS = hiddenSelection || markerBlob.empty() ? D3D12_SHADER_BYTECODE{ nullptr, 0 } : D3D12_SHADER_BYTECODE{ markerBlob.data(), markerBlob.size() };
 					

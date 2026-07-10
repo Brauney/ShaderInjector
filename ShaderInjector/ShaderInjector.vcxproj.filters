@@ -255,4 +255,13 @@
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="ShaderInjector.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Build\FinalizeRelease.ps1" />
+    <None Include="Build\Signing.md" />
+  </ItemGroup>
 </Project>

@@ -10,11 +10,8 @@
 
 namespace DatabaseModifiedShaders
 {
-	namespace
-	{
-		std::vector<ModifiedShader::PackageDisk> gModifiedShaders;
-		bool gModifiedShadersLoaded = false;
-	}
+	std::vector<ModifiedShader::PackageDisk> gModifiedShaders;
+	bool gModifiedShadersLoaded = false;
 
 	void RefreshModifiedShaders()
 	{

@@ -20,7 +20,7 @@
 
 namespace Hooks
 {
-	// Dummy objects are created only to discover D3D12/DXGI vtable addresses for MinHook.
+	//dummy objects are created only to discover D3D12/DXGI vtable addresses for MinHook.
 	static Microsoft::WRL::ComPtr<IDXGISwapChain3>           gDummySwapChain = nullptr;
 	static Microsoft::WRL::ComPtr<ID3D12Device>              gDummyDevice = nullptr;
 	static Microsoft::WRL::ComPtr<ID3D12CommandQueue>        gDummyCommandQueue = nullptr;

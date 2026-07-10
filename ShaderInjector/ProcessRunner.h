@@ -18,10 +18,7 @@ namespace ProcessRunner
 		}
 	};
 
-	// Launches an executable directly without a command shell. Arguments are passed
-	// individually so paths and user-controlled values never need shell escaping.
-	ProcessResult Run(
-		const std::string& executablePath,
-		const std::vector<std::string>& arguments,
-		const std::string& standardOutputPath = "");
+	//launches an executable directly without a command shell.
+	//arguments are passed individually so paths and user-controlled values never need shell escaping.
+	ProcessResult Run(const std::string& executablePath, const std::vector<std::string>& arguments, const std::string& standardOutputPath = "");
 }
