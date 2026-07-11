@@ -13,7 +13,8 @@ namespace CrossVersionDiscoveryTest
 	{
 		constexpr double maximumReplacementByteLengthDifferenceRatio = 0.05;
 
-		constexpr size_t byteLengthTolerancePercent = 15;
+		constexpr size_t byteLengthLowerTolerancePercent = 35;
+		constexpr size_t byteLengthUpperTolerancePercent = 15;
 	}
 
 	bool HasPlausibleReplacementByteLength(size_t candidateLength, const ShaderTarget::ShaderTargetDisk& replacement)
@@ -50,9 +51,10 @@ namespace CrossVersionDiscoveryTest
 			if (knownLength == 0)
 				continue;
 
-			const size_t tolerance = (std::max<size_t>)(1, (knownLength * byteLengthTolerancePercent) / 100);
-			const size_t minimumLength = knownLength > tolerance ? knownLength - tolerance : 1;
-			const size_t maximumLength = knownLength + tolerance;
+			const size_t lowerTolerance = (std::max<size_t>)(1, (knownLength * byteLengthLowerTolerancePercent) / 100);
+			const size_t upperTolerance = (std::max<size_t>)(1, (knownLength * byteLengthUpperTolerancePercent) / 100);
+			const size_t minimumLength = knownLength > lowerTolerance ? knownLength - lowerTolerance : 1;
+			const size_t maximumLength = knownLength + upperTolerance;
 			if (byteLength >= minimumLength && byteLength <= maximumLength)
 				return true;
 		}
