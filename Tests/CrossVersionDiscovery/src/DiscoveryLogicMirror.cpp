@@ -11,10 +11,8 @@ namespace CrossVersionDiscoveryTest
 {
 	namespace
 	{
-		// ShaderDiscovery.cpp lines 19-22
 		constexpr double maximumReplacementByteLengthDifferenceRatio = 0.05;
 
-		// ShaderAutomaticDiscovery.cpp line 91
 		constexpr size_t byteLengthTolerancePercent = 15;
 	}
 
@@ -138,7 +136,6 @@ namespace CrossVersionDiscoveryTest
 			return result;
 		}
 
-		// ShaderDiscovery.cpp fuzzy fallback (after exact identity miss, before reject).
 		double bestFuzzyScore = 0.0;
 		double secondBestFuzzyScore = 0.0;
 		int bestFuzzyReplacementIndex = -1;
