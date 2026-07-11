@@ -161,6 +161,7 @@ namespace ShaderDiscovery
 			return -1;
 
 		bool hasPlausibleReplacement = false;
+		std::unordered_set<std::string> acceptablePortableReflectionHashes;
 		for (const ShaderTarget::ShaderTargetDisk& replacement : replacements)
 		{
 			if (replacement.enabled && replacement.shaderType == shaderType &&
@@ -168,7 +169,10 @@ namespace ShaderDiscovery
 				HasPlausibleByteLength(shaderBytecode.size(), replacement))
 			{
 				hasPlausibleReplacement = true;
-				break;
+				// crossVersionIdentityHash always incorporates portableReflectionIdentityHash, so
+				// a candidate whose portableReflectionIdentityHash isn't among these can never
+				// produce an exact or fuzzy match below - safe to use as a cheap pre-filter.
+				acceptablePortableReflectionHashes.insert(replacement.originalShaderAnalysis.portableReflectionIdentityHash);
 			}
 		}
 
@@ -186,7 +190,8 @@ namespace ShaderDiscovery
 		}
 		else
 		{
-			ShaderAnalyzer::Analyze(shaderBytecode.data(), shaderBytecode.size(), candidateAnalysis);
+			ShaderAnalyzer::Analyze(
+				shaderBytecode.data(), shaderBytecode.size(), candidateAnalysis, &acceptablePortableReflectionHashes);
 			gReplacementCandidateAnalyses.emplace(candidateKey, candidateAnalysis);
 		}
 
@@ -472,9 +477,26 @@ namespace ShaderDiscovery
 
 		if (!haveCachedAnalysis)
 		{
+			// Cross-version matches always share an exact portableReflectionIdentityHash (cheap,
+			// no disassembly needed), so collecting the identities of compatible targets first
+			// lets Analyze() skip its expensive disassembly step for candidates that can never
+			// match anything - which is most of them.
+			std::unordered_set<std::string> acceptablePortableReflectionHashes;
+			for (const ModifiedShader::PackageDisk& package : modifiedShaders)
+			{
+				if (!package.enabled || package.shaderType != shaderType)
+					continue;
+				for (const ModifiedShader::TargetDisk& target : package.targets)
+				{
+					if (!target.shaderAnalysis.portableReflectionIdentityHash.empty())
+						acceptablePortableReflectionHashes.insert(target.shaderAnalysis.portableReflectionIdentityHash);
+				}
+			}
+
 			// This is the expensive part (DXIL reflection + disassembly), intentionally run
 			// without holding gModifiedDiscoveryMutex so worker threads run it concurrently.
-			ShaderAnalyzer::Analyze(shaderBytecode.data(), shaderBytecode.size(), candidateAnalysis);
+			ShaderAnalyzer::Analyze(
+				shaderBytecode.data(), shaderBytecode.size(), candidateAnalysis, &acceptablePortableReflectionHashes);
 			std::lock_guard<std::mutex> lock(gModifiedDiscoveryMutex);
 			gModifiedCandidateAnalyses.emplace(candidateKey, candidateAnalysis);
 		}
