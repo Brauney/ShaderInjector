@@ -201,11 +201,11 @@ namespace ShaderDiscovery
 			else
 			{
 				auto appendMissingField = [&](const char* fieldName)
-				{
-					if (!failureReason.empty())
-						failureReason += ", ";
-					failureReason += fieldName;
-				};
+					{
+						if (!failureReason.empty())
+							failureReason += ", ";
+						failureReason += fieldName;
+					};
 				if (candidateAnalysis.portableReflectionIdentityHash.empty())
 					appendMissingField("portableReflectionIdentityHash");
 				if (candidateAnalysis.semanticInstructionSetHash.empty())
@@ -312,14 +312,14 @@ namespace ShaderDiscovery
 						replacements[bestFuzzyReplacementIndex].originalShaderAnalysis;
 
 					auto appendDiff = [&](const char* label, const std::string& left, const std::string& right)
-					{
-						if (left != right)
 						{
-							if (!identityDiff.empty())
-								identityDiff += ", ";
-							identityDiff += std::string(label) + "=" + left + "!=" + right;
-						}
-					};
+							if (left != right)
+							{
+								if (!identityDiff.empty())
+									identityDiff += ", ";
+								identityDiff += std::string(label) + "=" + left + "!=" + right;
+							}
+						};
 					appendDiff("portableReflection",
 						candidateAnalysis.portableReflectionIdentityHash,
 						bestAnalysis.portableReflectionIdentityHash);
@@ -366,23 +366,30 @@ namespace ShaderDiscovery
 		if (outCandidateAnalysis)
 			*outCandidateAnalysis = ShaderAnalysis::ShaderAnalysisDisk{};
 
-		std::lock_guard<std::mutex> lock(gModifiedDiscoveryMutex);
 		if (shaderHash == 0 || shaderBytecode.empty())
 			return -1;
 
 		const ShaderKey candidateKey{ shaderHash, shaderType };
-		const auto cachedMatch = gDiscoveredModifiedShaders.find(candidateKey);
-		if (cachedMatch != gDiscoveredModifiedShaders.end())
-		{
-			for (int index = 0; index < static_cast<int>(modifiedShaders.size()); ++index)
-			{
-				if (modifiedShaders[index].id == cachedMatch->second && modifiedShaders[index].enabled)
-					return index;
-			}
-		}
 
-		if (gAttemptedModifiedShaders.find(candidateKey) != gAttemptedModifiedShaders.end())
-			return -1;
+		// gModifiedDiscoveryMutex only protects the shared caches below (gDiscoveredModifiedShaders,
+		// gAttemptedModifiedShaders, gModifiedCandidateAnalyses). It is deliberately NOT held across
+		// the expensive DXIL analysis or scoring work further down, so multiple worker threads can
+		// actually analyze different candidates at the same time instead of queuing up behind one lock.
+		{
+			std::lock_guard<std::mutex> lock(gModifiedDiscoveryMutex);
+			const auto cachedMatch = gDiscoveredModifiedShaders.find(candidateKey);
+			if (cachedMatch != gDiscoveredModifiedShaders.end())
+			{
+				for (int index = 0; index < static_cast<int>(modifiedShaders.size()); ++index)
+				{
+					if (modifiedShaders[index].id == cachedMatch->second && modifiedShaders[index].enabled)
+						return index;
+				}
+			}
+
+			if (gAttemptedModifiedShaders.find(candidateKey) != gAttemptedModifiedShaders.end())
+				return -1;
+		}
 
 		bool hasCompatiblePackage = false;
 		for (const ModifiedShader::PackageDisk& package : modifiedShaders)
@@ -395,6 +402,7 @@ namespace ShaderDiscovery
 		}
 		if (!hasCompatiblePackage)
 		{
+			std::lock_guard<std::mutex> lock(gModifiedDiscoveryMutex);
 			gAttemptedModifiedShaders.insert(candidateKey);
 			return -1;
 		}
@@ -440,6 +448,7 @@ namespace ShaderDiscovery
 
 		if (hashMatchIndex >= 0)
 		{
+			std::lock_guard<std::mutex> lock(gModifiedDiscoveryMutex);
 			gDiscoveredModifiedShaders[candidateKey] = modifiedShaders[hashMatchIndex].id;
 			ShaderInjectorGUI::WriteToRuntimeLogSuccess(
 				"ShaderDiscovery->DiscoverEnabledModifiedShader: direct hash match " +
@@ -450,12 +459,23 @@ namespace ShaderDiscovery
 
 #if SHADER_INJECTOR_DISCOVERY_MATCH_MODIFIED_SHADER_BY_ANALYSIS
 		ShaderAnalysis::ShaderAnalysisDisk candidateAnalysis{};
-		const auto cachedAnalysis = gModifiedCandidateAnalyses.find(candidateKey);
-		if (cachedAnalysis != gModifiedCandidateAnalyses.end())
-			candidateAnalysis = cachedAnalysis->second;
-		else
+		bool haveCachedAnalysis = false;
 		{
+			std::lock_guard<std::mutex> lock(gModifiedDiscoveryMutex);
+			const auto cachedAnalysis = gModifiedCandidateAnalyses.find(candidateKey);
+			if (cachedAnalysis != gModifiedCandidateAnalyses.end())
+			{
+				candidateAnalysis = cachedAnalysis->second;
+				haveCachedAnalysis = true;
+			}
+		}
+
+		if (!haveCachedAnalysis)
+		{
+			// This is the expensive part (DXIL reflection + disassembly), intentionally run
+			// without holding gModifiedDiscoveryMutex so worker threads run it concurrently.
 			ShaderAnalyzer::Analyze(shaderBytecode.data(), shaderBytecode.size(), candidateAnalysis);
+			std::lock_guard<std::mutex> lock(gModifiedDiscoveryMutex);
 			gModifiedCandidateAnalyses.emplace(candidateKey, candidateAnalysis);
 		}
 
@@ -502,6 +522,7 @@ namespace ShaderDiscovery
 			if (bestPackageIndex >= 0 && bestScore >= SHADER_INJECTOR_DISCOVERY_MINIMUM_SIMILARITY_SCORE &&
 				bestScore - secondBestScore >= SHADER_INJECTOR_DISCOVERY_SIMILARITY_AMBIGUITY_MARGIN)
 			{
+				std::lock_guard<std::mutex> lock(gModifiedDiscoveryMutex);
 				gDiscoveredModifiedShaders[candidateKey] = modifiedShaders[bestPackageIndex].id;
 				ShaderInjectorGUI::WriteToRuntimeLogSuccess(
 					"ShaderDiscovery->DiscoverEnabledModifiedShader: analysis match " +
@@ -536,14 +557,14 @@ namespace ShaderDiscovery
 				if (bestTargetAnalysis)
 				{
 					auto appendDiff = [&](const char* label, const std::string& left, const std::string& right)
-					{
-						if (left != right)
 						{
-							if (!identityDiff.empty())
-								identityDiff += ", ";
-							identityDiff += std::string(label) + "=" + left + "!=" + right;
-						}
-					};
+							if (left != right)
+							{
+								if (!identityDiff.empty())
+									identityDiff += ", ";
+								identityDiff += std::string(label) + "=" + left + "!=" + right;
+							}
+						};
 					appendDiff("portableReflection",
 						candidateAnalysis.portableReflectionIdentityHash,
 						bestTargetAnalysis->portableReflectionIdentityHash);
@@ -579,6 +600,7 @@ namespace ShaderDiscovery
 		}
 #endif
 
+		std::lock_guard<std::mutex> lock(gModifiedDiscoveryMutex);
 		gAttemptedModifiedShaders.insert(candidateKey);
 		return -1;
 	}
