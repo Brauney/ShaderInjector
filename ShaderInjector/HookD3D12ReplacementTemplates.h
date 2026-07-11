@@ -21,6 +21,12 @@ namespace HookD3D12
 	SIZE_T CountMatchingBytes(const std::vector<uint8_t>& lhs, const std::vector<uint8_t>& rhs);
 	bool WriteStreamPipelineTemplateVariant(ShaderTarget::ShaderTargetDisk& replacement, const PipelineStateInfo& pipeline, int pipelineIndex, int templateIndex, bool& ok);
 	void WriteMatchingStreamPipelineTemplateVariants(ShaderTarget::ShaderTargetDisk& replacement, ShaderTarget::ShaderType shaderType, uint64_t shaderHash, bool& ok);
+	bool PersistAppliedStreamPipelineTemplate(
+		ShaderTarget::ShaderTargetDisk& replacement,
+		const PipelineStateInfo& pipeline,
+		int pipelineIndex,
+		ShaderTarget::ShaderType shaderType,
+		uint64_t shaderHash);
 	bool PersistStreamPipelineTemplatesForShaderAlias(
 		ShaderTarget::ShaderTargetDisk& replacement,
 		ShaderTarget::ShaderType shaderType,

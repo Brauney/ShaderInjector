@@ -1,7 +1,9 @@
 #include "ShaderAutomaticDiscovery.h"
 
 #include <deque>
+#include <algorithm>
 #include <condition_variable>
+#include <cstdlib>
 #include <memory>
 #include <mutex>
 #include <thread>
@@ -14,6 +16,7 @@
 #include "Hash.h"
 #include "HookD3D12.h"
 #include "HookD3D12PipelineUtils.h"
+#include "ShaderAnalysis.h"
 #include "ShaderDiscovery.h"
 #include "ShaderInjectorGUI.h"
 
@@ -68,6 +71,7 @@ namespace ShaderAutomaticDiscovery
 		{
 			QueuedShader queuedShader;
 			std::string modifiedShaderId;
+			ShaderAnalysis::ShaderAnalysisDisk shaderAnalysis;
 		};
 
 		std::mutex gQueueMutex;
@@ -78,11 +82,57 @@ namespace ShaderAutomaticDiscovery
 		std::unordered_map<ShaderKey, std::string, ShaderKeyHasher> gDirectMatchShaders;
 		std::shared_ptr<const std::vector<ModifiedShader::PackageDisk>> gModifiedShaderAnalysisSnapshot;
 		bool gCompatibleShaderTypes[static_cast<size_t>(ShaderTarget::Unknown) + 1]{};
+		std::vector<std::pair<size_t, size_t>> gPlausibleByteLengthRanges[static_cast<size_t>(ShaderTarget::Unknown) + 1];
 		std::condition_variable gAnalysisCondition;
 		std::thread* gAnalysisWorker = nullptr;
 		bool gAnalysisWorkerRunning = false;
 		bool gAnalysisStopRequested = false;
 		bool gAcceptingWork = true;
+		constexpr size_t byteLengthTolerancePercent = 15;
+
+		bool ParseByteLength(const std::string& byteLengthText, size_t& outByteLength)
+		{
+			if (byteLengthText.empty())
+				return false;
+
+			char* parseEnd = nullptr;
+			const unsigned long long parsedLength = std::strtoull(byteLengthText.c_str(), &parseEnd, 10);
+			if (!parseEnd || *parseEnd != '\0' || parsedLength == 0)
+				return false;
+
+			outByteLength = static_cast<size_t>(parsedLength);
+			return true;
+		}
+
+		void AddPlausibleByteLengthRange(ShaderTarget::ShaderType shaderType, size_t byteLength)
+		{
+			const size_t shaderTypeIndex = static_cast<size_t>(shaderType);
+			if (shaderTypeIndex >= static_cast<size_t>(ShaderTarget::Unknown) || byteLength == 0)
+				return;
+
+			const size_t tolerance = (std::max<size_t>)(1, (byteLength * byteLengthTolerancePercent) / 100);
+			const size_t minimumLength = byteLength > tolerance ? byteLength - tolerance : 1;
+			const size_t maximumLength = byteLength + tolerance;
+			gPlausibleByteLengthRanges[shaderTypeIndex].push_back({ minimumLength, maximumLength });
+		}
+
+		bool HasPlausibleByteLength(ShaderTarget::ShaderType shaderType, size_t byteLength)
+		{
+			const size_t shaderTypeIndex = static_cast<size_t>(shaderType);
+			if (shaderTypeIndex >= static_cast<size_t>(ShaderTarget::Unknown))
+				return false;
+
+			const std::vector<std::pair<size_t, size_t>>& ranges = gPlausibleByteLengthRanges[shaderTypeIndex];
+			if (ranges.empty())
+				return true;
+
+			for (const auto& range : ranges)
+			{
+				if (byteLength >= range.first && byteLength <= range.second)
+					return true;
+			}
+			return false;
+		}
 
 		bool TargetContainsHash(const ShaderTarget::ShaderTargetDisk& target, uint64_t shaderHash)
 		{
@@ -138,6 +188,9 @@ namespace ShaderAutomaticDiscovery
 			const auto directMatchIterator = gDirectMatchShaders.find(key);
 			const bool directMatch = directMatchIterator != gDirectMatchShaders.end() &&
 				!directMatchIterator->second.empty();
+			if (!force && !directMatch && !HasPlausibleByteLength(shaderType, shaderBytecode.size()))
+				return true;
+
 			if (!force && !gSubmittedShaders.insert(key).second)
 				return true;
 			if (force)
@@ -211,7 +264,8 @@ namespace ShaderAutomaticDiscovery
 			const char* sourceList,
 			PipelineType& pipeline,
 			const QueuedShader& queued,
-			const std::string& modifiedShaderId)
+			const std::string& modifiedShaderId,
+			const ShaderAnalysis::ShaderAnalysisDisk* shaderAnalysis)
 		{
 			if (!HookD3D12::CreateShaderTargetForPipeline(
 				sourceList,
@@ -222,12 +276,12 @@ namespace ShaderAutomaticDiscovery
 				queued.shaderBytecode.data(),
 				pipeline,
 				modifiedShaderId,
-				false))
+				false,
+				shaderAnalysis))
 			{
 				return false;
 			}
 
-			HookD3D12::RefreshLoadedShaderTargets();
 			HookD3D12::MarkShaderTargetApplyDirty();
 			ShaderInjectorGUI::WriteToRuntimeLogSuccess(
 				"ShaderAutomaticDiscovery: created ShaderTarget for " + Hash::FormatHash(queued.key.hash) +
@@ -235,7 +289,7 @@ namespace ShaderAutomaticDiscovery
 			return true;
 		}
 
-		void ProcessMatchedShader(QueuedShader& queued, const std::string& modifiedShaderId)
+		void ProcessMatchedShader(QueuedShader& queued, const std::string& modifiedShaderId, const ShaderAnalysis::ShaderAnalysisDisk* shaderAnalysis = nullptr)
 		{
 			if (!HookD3D12::gLoadedShaderTargetsOnce)
 				HookD3D12::RefreshLoadedShaderTargets();
@@ -286,7 +340,7 @@ namespace ShaderAutomaticDiscovery
 				HookD3D12::GraphicsPipelineInfo pipeline{};
 				if (CopyGraphicsPipeline(queued.pipelineState.Get(), pipeline))
 				{
-					CreateTargetForMatch("Graphics", pipeline, queued, modifiedShaderId);
+					CreateTargetForMatch("Graphics", pipeline, queued, modifiedShaderId, shaderAnalysis);
 					if (pipeline.originalDesc.pRootSignature)
 						pipeline.originalDesc.pRootSignature->Release();
 				}
@@ -296,7 +350,7 @@ namespace ShaderAutomaticDiscovery
 				HookD3D12::PipelineStateInfo pipeline{};
 				if (CopyStreamPipeline(queued.pipelineState.Get(), pipeline))
 				{
-					CreateTargetForMatch("Stream", pipeline, queued, modifiedShaderId);
+					CreateTargetForMatch("Stream", pipeline, queued, modifiedShaderId, shaderAnalysis);
 					if (pipeline.rootSignature)
 						pipeline.rootSignature->Release();
 				}
@@ -327,17 +381,20 @@ namespace ShaderAutomaticDiscovery
 
 				try
 				{
+					ShaderAnalysis::ShaderAnalysisDisk candidateAnalysis{};
 					const int modifiedShaderIndex = ShaderDiscovery::DiscoverEnabledModifiedShader(
 						job.queuedShader.key.hash,
 						job.queuedShader.key.type,
 						job.queuedShader.shaderBytecode,
-						*job.modifiedShaders);
+						*job.modifiedShaders,
+						&candidateAnalysis);
 					if (modifiedShaderIndex < 0 || modifiedShaderIndex >= static_cast<int>(job.modifiedShaders->size()))
 						continue;
 
 					AnalysisResult result{};
 					result.queuedShader = std::move(job.queuedShader);
 					result.modifiedShaderId = (*job.modifiedShaders)[modifiedShaderIndex].id;
+					result.shaderAnalysis = std::move(candidateAnalysis);
 					{
 						std::lock_guard<std::mutex> lock(gQueueMutex);
 						gAnalysisResults.push_back(std::move(result));
@@ -394,6 +451,8 @@ namespace ShaderAutomaticDiscovery
 		gDirectMatchShaders.clear();
 		for (bool& compatibleShaderType : gCompatibleShaderTypes)
 			compatibleShaderType = false;
+		for (auto& ranges : gPlausibleByteLengthRanges)
+			ranges.clear();
 
 		for (const ModifiedShader::PackageDisk& modifiedShader : modifiedShaders)
 		{
@@ -407,6 +466,10 @@ namespace ShaderAutomaticDiscovery
 
 			for (const ModifiedShader::TargetDisk& target : modifiedShader.targets)
 			{
+				size_t targetByteLength = 0;
+				if (ParseByteLength(target.originalShaderBytecodeLength, targetByteLength))
+					AddPlausibleByteLengthRange(modifiedShader.shaderType, targetByteLength);
+
 				for (const std::string& knownHash : target.knownShaderBytecodeHashes)
 				{
 					const uint64_t parsedHash = Hash::ParseHashText(knownHash);
@@ -441,7 +504,7 @@ namespace ShaderAutomaticDiscovery
 				result = std::move(gAnalysisResults.front());
 				gAnalysisResults.pop_front();
 			}
-			ProcessMatchedShader(result.queuedShader, result.modifiedShaderId);
+			ProcessMatchedShader(result.queuedShader, result.modifiedShaderId, &result.shaderAnalysis);
 		}
 
 		// Submit a bounded amount of new work each frame. The worker processes jobs serially.

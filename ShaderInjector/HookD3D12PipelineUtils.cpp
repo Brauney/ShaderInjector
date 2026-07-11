@@ -169,6 +169,10 @@ namespace HookD3D12
 	void FillStreamReplacementPortableStateFromBlob(ShaderTarget::ShaderTargetDisk& replacement, const PipelineStateInfo& pipeline)
 	{
 		FillCommonReplacementStageLengths(replacement, pipeline.vsSize, pipeline.psSize, pipeline.csSize, pipeline.gsSize, pipeline.hsSize, pipeline.dsSize);
+		replacement.asLength = pipeline.asSize ? std::to_string((size_t)pipeline.asSize) : "";
+		replacement.msLength = pipeline.msSize ? std::to_string((size_t)pipeline.msSize) : "";
+		replacement.asHash = pipeline.asHash ? Hash::FormatHash(pipeline.asHash) : "";
+		replacement.msHash = pipeline.msHash ? Hash::FormatHash(pipeline.msHash) : "";
 		FillInputAndStreamOutputSignatures(replacement, pipeline.inputElements, pipeline.soDeclarations, pipeline.soStrides);
 		replacement.pipelineStreamLength = pipeline.streamBlob.empty() ? "" : std::to_string(pipeline.streamBlob.size());
 		replacement.pipelineStreamSubobjectTypes = PipelineStreamSubobjectTypeSignature(pipeline.streamBlob);
@@ -467,6 +471,30 @@ namespace HookD3D12
 						info.csBytecode.assign((const uint8_t*)subobj->payload.pShaderBytecode, (const uint8_t*)subobj->payload.pShaderBytecode + subobj->payload.BytecodeLength);
 					}
 					info.isCompute = true;
+					break;
+				}
+				case D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_AS:
+				{
+					auto* subobj = reinterpret_cast<const PSOSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_AS, D3D12_SHADER_BYTECODE>*>(ptr);
+					if (subobj->payload.pShaderBytecode && subobj->payload.BytecodeLength)
+					{
+						info.asHash = Hash::HashMemory(subobj->payload.pShaderBytecode, subobj->payload.BytecodeLength);
+						info.asSize = subobj->payload.BytecodeLength;
+						info.asBytecode.assign((const uint8_t*)subobj->payload.pShaderBytecode, (const uint8_t*)subobj->payload.pShaderBytecode + subobj->payload.BytecodeLength);
+					}
+					info.isGraphics = true;
+					break;
+				}
+				case D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_MS:
+				{
+					auto* subobj = reinterpret_cast<const PSOSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_MS, D3D12_SHADER_BYTECODE>*>(ptr);
+					if (subobj->payload.pShaderBytecode && subobj->payload.BytecodeLength)
+					{
+						info.msHash = Hash::HashMemory(subobj->payload.pShaderBytecode, subobj->payload.BytecodeLength);
+						info.msSize = subobj->payload.BytecodeLength;
+						info.msBytecode.assign((const uint8_t*)subobj->payload.pShaderBytecode, (const uint8_t*)subobj->payload.pShaderBytecode + subobj->payload.BytecodeLength);
+					}
+					info.isGraphics = true;
 					break;
 				}
 				case D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_INPUT_LAYOUT:

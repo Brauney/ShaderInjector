@@ -17,6 +17,8 @@ namespace HookD3D12
 		if (!pipelineStreamDescription || !pipelineStreamDescription->pPipelineStateSubobjectStream || pipelineStreamDescription->SizeInBytes == 0 || !pipelineState)
 			return;
 
+		NotifyPipelineActivity();
+
 		PipelineStateInfo capturedPipeline{};
 		capturedPipeline.pipelineState = pipelineState;
 

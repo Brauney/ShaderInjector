@@ -99,6 +99,8 @@ namespace HookD3D12
 		uint64_t hsHash = 0; SIZE_T hsSize = 0;
 		uint64_t dsHash = 0; SIZE_T dsSize = 0;
 		uint64_t csHash = 0; SIZE_T csSize = 0;
+		uint64_t asHash = 0; SIZE_T asSize = 0;
+		uint64_t msHash = 0; SIZE_T msSize = 0;
 
 		bool isGraphics = false;
 		bool isCompute = false;
@@ -131,6 +133,8 @@ namespace HookD3D12
 		std::vector<uint8_t> hsBytecode;
 		std::vector<uint8_t> dsBytecode;
 		std::vector<uint8_t> csBytecode;
+		std::vector<uint8_t> asBytecode;
+		std::vector<uint8_t> msBytecode;
 	};
 
 	struct UncapturedPipelineStateInfo
@@ -192,6 +196,7 @@ namespace HookD3D12
 
 	int FindEnabledShaderTarget(uint64_t shaderHash, ShaderTarget::ShaderType shaderType);
 	void MarkShaderTargetApplyDirty();
+	void NotifyPipelineActivity();
 	void InvalidateAllReplacementPSOs();
 	void ResetUncapturedReplacementAttempts();
 	void ClearShaderMarkers();
@@ -219,7 +224,8 @@ namespace HookD3D12
 		const void* shaderBytecode,
 		GraphicsPipelineInfo& pipeline,
 		const std::string& modifiedShaderId,
-		bool generateShaderDisassembly);
+		bool generateShaderDisassembly,
+		const ShaderAnalysis::ShaderAnalysisDisk* originalShaderAnalysis = nullptr);
 	bool CreateShaderTargetForPipeline(
 		const std::string& sourceList,
 		int pipelineIndex,
@@ -229,7 +235,8 @@ namespace HookD3D12
 		const void* shaderBytecode,
 		PipelineStateInfo& pipeline,
 		const std::string& modifiedShaderId,
-		bool generateShaderDisassembly);
+		bool generateShaderDisassembly,
+		const ShaderAnalysis::ShaderAnalysisDisk* originalShaderAnalysis = nullptr);
 
 	extern void Release();
 	bool IsInitialized();

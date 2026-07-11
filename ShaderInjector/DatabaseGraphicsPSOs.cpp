@@ -18,6 +18,8 @@ namespace HookD3D12
 		if (!pipelineDescription || !pipelineState)
 			return;
 
+		NotifyPipelineActivity();
+
 		GraphicsPipelineInfo capturedPipeline{};
 		capturedPipeline.pipelineState = pipelineState;
 
@@ -123,6 +125,8 @@ namespace HookD3D12
 	{
 		if (!pipelineDescription || !pipelineState)
 			return;
+
+		NotifyPipelineActivity();
 
 		ComputePipelineInfo capturedPipeline{};
 		capturedPipeline.pipelineState = pipelineState;

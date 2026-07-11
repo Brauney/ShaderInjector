@@ -52,18 +52,24 @@ namespace ShaderTarget
 		std::string geometryShaderBlobPath;
 		std::string hullShaderBlobPath;
 		std::string domainShaderBlobPath;
+		std::string amplificationShaderBlobPath;
+		std::string meshShaderBlobPath;
 		std::string vsHash;
 		std::string psHash;
 		std::string csHash;
 		std::string gsHash;
 		std::string hsHash;
 		std::string dsHash;
+		std::string asHash;
+		std::string msHash;
 		std::string vsLength;
 		std::string psLength;
 		std::string csLength;
 		std::string gsLength;
 		std::string hsLength;
 		std::string dsLength;
+		std::string asLength;
+		std::string msLength;
 		std::string pipelineStreamLength;
 		std::string pipelineStreamSubobjectTypes;
 		std::string inputLayoutElementCount;
@@ -94,18 +100,24 @@ namespace ShaderTarget
 			geometryShaderBlobPath,
 			hullShaderBlobPath,
 			domainShaderBlobPath,
+			amplificationShaderBlobPath,
+			meshShaderBlobPath,
 			vsHash,
 			psHash,
 			csHash,
 			gsHash,
 			hsHash,
 			dsHash,
+			asHash,
+			msHash,
 			vsLength,
 			psLength,
 			csLength,
 			gsLength,
 			hsLength,
 			dsLength,
+			asLength,
+			msLength,
 			pipelineStreamLength,
 			pipelineStreamSubobjectTypes,
 			inputLayoutElementCount,
@@ -163,6 +175,8 @@ namespace ShaderTarget
 		std::string geometryShaderBlobPath;
 		std::string hullShaderBlobPath;
 		std::string domainShaderBlobPath;
+		std::string amplificationShaderBlobPath;
+		std::string meshShaderBlobPath;
 		std::string targetSubobjectType;
 
 		std::string vsHash;
@@ -171,12 +185,16 @@ namespace ShaderTarget
 		std::string gsHash;
 		std::string hsHash;
 		std::string dsHash;
+		std::string asHash;
+		std::string msHash;
 		std::string vsLength;
 		std::string psLength;
 		std::string csLength;
 		std::string gsLength;
 		std::string hsLength;
 		std::string dsLength;
+		std::string asLength;
+		std::string msLength;
 
 		std::string renderTargetFormat0;
 		std::string renderTargetFormats;
@@ -200,71 +218,10 @@ namespace ShaderTarget
 
 		double CalculateSimilarityScore(const ShaderTargetDisk& other) const;
 		static double CalculateSimilarityScore(const std::vector<ShaderTargetDisk>& left, const std::vector<ShaderTargetDisk>& right);
-
-		//JSON support
-		NLOHMANN_ORDERED_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(
-			ShaderTargetDisk,
-			schemaVersion,
-			enabled,
-			name,
-			shaderType,
-			shaderProfile,
-			shaderEntryPoint,
-			originalShaderBytecodeHash,
-			originalShaderBytecodeLength,
-			originalShaderBlobPath,
-			modifiedShaderId,
-			replacementDirectory,
-			jsonPath,
-			sourceList,
-			pipelineIndex,
-			pipelineStateType,
-			psoPointer,
-			pipelineCachedBlobHash,
-			pipelineCachedBlobLength,
-			pipelineCachedBlobPath,
-			pipelineStreamBlobPath,
-			pipelineStreamMetadataPath,
-			rootSignatureBlobPath,
-			rootSignatureHash,
-			vertexShaderBlobPath,
-			pixelShaderBlobPath,
-			computeShaderBlobPath,
-			geometryShaderBlobPath,
-			hullShaderBlobPath,
-			domainShaderBlobPath,
-			targetSubobjectType,
-			vsHash,
-			psHash,
-			csHash,
-			gsHash,
-			hsHash,
-			dsHash,
-			vsLength,
-			psLength,
-			csLength,
-			gsLength,
-			hsLength,
-			dsLength,
-			renderTargetFormat0,
-			renderTargetFormats,
-			numRenderTargets,
-			depthStencilFormat,
-			primitiveTopologyType,
-			sampleCount,
-			sampleQuality,
-			sampleMask,
-			blendStateHash,
-			rasterizerStateHash,
-			depthStencilStateHash,
-			pipelineStreamLength,
-			pipelineStreamSubobjectTypes,
-			rootSignatureLength,
-			inputLayoutElementCount,
-			inputLayoutSignature,
-			streamOutputDeclarationCount,
-			streamOutputSignature)
 	};
+
+	void to_json(nlohmann::ordered_json& json, const ShaderTargetDisk& shaderTarget);
+	void from_json(const nlohmann::ordered_json& json, ShaderTargetDisk& shaderTarget);
 
 	struct ShaderInputElementDisk
 	{

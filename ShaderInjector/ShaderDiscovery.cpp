@@ -238,8 +238,12 @@ namespace ShaderDiscovery
 		uint64_t shaderHash,
 		ShaderTarget::ShaderType shaderType,
 		const std::vector<uint8_t>& shaderBytecode,
-		const std::vector<ModifiedShader::PackageDisk>& modifiedShaders)
+		const std::vector<ModifiedShader::PackageDisk>& modifiedShaders,
+		ShaderAnalysis::ShaderAnalysisDisk* outCandidateAnalysis)
 	{
+		if (outCandidateAnalysis)
+			*outCandidateAnalysis = ShaderAnalysis::ShaderAnalysisDisk{};
+
 		std::lock_guard<std::mutex> lock(gModifiedDiscoveryMutex);
 		if (shaderHash == 0 || shaderBytecode.empty())
 			return -1;
@@ -289,6 +293,8 @@ namespace ShaderDiscovery
 					if (Hash::ParseHashText(knownHash) == shaderHash)
 					{
 						packageMatchesHash = true;
+						if (outCandidateAnalysis && target.shaderAnalysis.succeeded)
+							*outCandidateAnalysis = target.shaderAnalysis;
 						break;
 					}
 				}
@@ -333,6 +339,9 @@ namespace ShaderDiscovery
 
 		if (candidateAnalysis.succeeded)
 		{
+			if (outCandidateAnalysis)
+				*outCandidateAnalysis = candidateAnalysis;
+
 			double bestScore = 0.0;
 			double secondBestScore = 0.0;
 			int bestPackageIndex = -1;

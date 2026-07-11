@@ -17,6 +17,7 @@
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
+#include <atomic>
 #include <dxgi.h>
 #include <dxgi1_4.h>
 #include <dxgi1_6.h>
@@ -103,6 +104,9 @@ namespace HookD3D12
 
 	static bool gShaderTargetApplyDirty = true;
 	static bool gPipelineStateOverridesDirty = true;
+	static constexpr int gMaximumUncapturedReplacementAttemptsPerFrame = 1;
+	static constexpr ULONGLONG gPipelineActivityQuietPeriodMs = 2500;
+	static std::atomic<ULONGLONG> gLastPipelineActivityTick = 0;
 	PixelShaderSelectionStyle gShaderSelectionStyle = PixelShaderSelectionStyle::BluePixelShader;
 
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| CREATE DEVICE |||||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -113,6 +117,17 @@ namespace HookD3D12
 	{
 		gShaderTargetApplyDirty = true;
 		gPipelineStateOverridesDirty = true;
+	}
+
+	void NotifyPipelineActivity()
+	{
+		gLastPipelineActivityTick.store(GetTickCount64(), std::memory_order_relaxed);
+	}
+
+	bool IsPipelineActivityQuiet()
+	{
+		ULONGLONG lastActivityTick = gLastPipelineActivityTick.load(std::memory_order_relaxed);
+		return lastActivityTick == 0 || GetTickCount64() - lastActivityTick >= gPipelineActivityQuietPeriodMs;
 	}
 
 	void ResetUncapturedReplacementAttempts()
@@ -381,6 +396,7 @@ namespace HookD3D12
 				if (updated)
 				{
 					info.attemptedReplacement = false;
+					NotifyPipelineActivity();
 					MarkShaderTargetApplyDirty();
 				}
 
@@ -403,6 +419,7 @@ namespace HookD3D12
 		}
 
 		gUncapturedPipelineStates.push_back(info);
+		NotifyPipelineActivity();
 
 		//char buffer[384];
 		//sprintf_s(buffer, "HookD3D12->RecordUncapturedPipelineStateLocked: %s uncaptured PSO=%p cachedHash=%s cachedBytes=%zu", reason ? reason : "Bound", pipelineState, info.cachedBlobHash ? Hash::FormatHash(info.cachedBlobHash).c_str() : "<none>", (size_t)info.cachedBlobSize);
@@ -599,7 +616,21 @@ namespace HookD3D12
 		bool patchedTarget = false;
 		bool patchedCache = false;
 		int  iterations = 0;
-
+		auto originalShaderForType = [&](D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type) -> const std::vector<uint8_t>*
+		{
+			switch (type)
+			{
+				case D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_VS: return &p.vsBytecode;
+				case D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PS: return &p.psBytecode;
+				case D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_CS: return &p.csBytecode;
+				case D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_GS: return &p.gsBytecode;
+				case D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_HS: return &p.hsBytecode;
+				case D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DS: return &p.dsBytecode;
+				case D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_AS: return &p.asBytecode;
+				case D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_MS: return &p.msBytecode;
+				default: return nullptr;
+			}
+		};
 		while (ptr < end)
 		{
 			if (ptr + sizeof(D3D12_PIPELINE_STATE_SUBOBJECT_TYPE) > end)
@@ -627,7 +658,7 @@ namespace HookD3D12
 				break;
 			}
 
-			if (type == targetType)
+			if (const std::vector<uint8_t>* originalBytecode = originalShaderForType(type))
 			{
 				uint8_t* payloadPtr = ptr + sizeof(void*);
 				D3D12_SHADER_BYTECODE* bc = reinterpret_cast<D3D12_SHADER_BYTECODE*>(payloadPtr);
@@ -651,9 +682,13 @@ namespace HookD3D12
 				//replacementShader = p.psBytecode;
 				//replacementShader[replacementShader.size() - 1] = 5; //modify byte
 				//bc->pShaderBytecode = replacementShader.data();
-				//bc->BytecodeLength = replacementShader.size();
-
-				if (!hiddenSelection && targetType == D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PS)
+				//bc->BytecodeLength = replacementShader.size();
+				if (type != targetType)
+				{
+					bc->pShaderBytecode = originalBytecode->empty() ? nullptr : originalBytecode->data();
+					bc->BytecodeLength = originalBytecode->size();
+				}
+				else if (!hiddenSelection && targetType == D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PS)
 				{
 					const std::vector<uint8_t>& markerBlob = !Globals::markerPixelShaderBlob.empty() ? Globals::markerPixelShaderBlob : Globals::nullPixelShaderBlob;
 					bc->pShaderBytecode = markerBlob.empty() ? nullptr : markerBlob.data();
@@ -670,7 +705,8 @@ namespace HookD3D12
 					bc->BytecodeLength = 0;
 				}
 
-				patchedTarget = true;
+				if (type == targetType)
+					patchedTarget = true;
 			}
 
 			// Always zero out CachedPSO regardless of target —
@@ -894,7 +930,9 @@ namespace HookD3D12
 		}
 
 		ID3D12PipelineState* rebuiltPipelineState = nullptr;
+		const ULONGLONG rebuildStartTick = GetTickCount64();
 		HRESULT hr = Original_CreateGraphicsPipelineState(gDevice, &desc, IID_PPV_ARGS(&rebuiltPipelineState));
+		const ULONGLONG rebuildDurationMs = GetTickCount64() - rebuildStartTick;
 
 		if (FAILED(hr) || !rebuiltPipelineState)
 		{
@@ -913,7 +951,7 @@ namespace HookD3D12
 		pipeline.activeShaderTargetUsesFallback = usedFallback;
 		RegisterKnownPipelineStateLocked(pipeline.psoWithReplacement);
 		gPipelineStateOverridesDirty = true;
-		ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12->RebuildGraphicsPSOWithReplacement: Applied graphics shader replacement: " + replacement.name + (usedFallback ? " (null shader fallback)" : ""));
+		ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12->RebuildGraphicsPSOWithReplacement: Applied graphics shader replacement: " + replacement.name + (usedFallback ? " (null shader fallback)" : "") + " durationMs=" + std::to_string(rebuildDurationMs));
 		return true;
 	}
 
@@ -959,7 +997,6 @@ namespace HookD3D12
 		uint8_t* end = ptr + patchedBlob.size();
 		bool patchedTarget = false;
 		bool missingRootSignature = false;
-
 		auto originalShaderForType = [&](D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type) -> const std::vector<uint8_t>*
 		{
 			switch (type)
@@ -970,6 +1007,8 @@ namespace HookD3D12
 				case D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_GS: return &pipeline.gsBytecode;
 				case D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_HS: return &pipeline.hsBytecode;
 				case D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DS: return &pipeline.dsBytecode;
+				case D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_AS: return &pipeline.asBytecode;
+				case D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_MS: return &pipeline.msBytecode;
 				default: return nullptr;
 			}
 		};
@@ -1058,7 +1097,9 @@ namespace HookD3D12
 		patchedDesc.SizeInBytes = patchedBlob.size();
 
 		ID3D12PipelineState* rebuiltPipelineState = nullptr;
+		const ULONGLONG rebuildStartTick = GetTickCount64();
 		HRESULT hr = CreatePipelineStateInternal(device2, &patchedDesc, IID_PPV_ARGS(&rebuiltPipelineState));
+		const ULONGLONG rebuildDurationMs = GetTickCount64() - rebuildStartTick;
 
 		device2->Release();
 
@@ -1078,8 +1119,10 @@ namespace HookD3D12
 		pipeline.activeShaderTargetHash = shaderHash;
 		pipeline.activeShaderTargetUsesFallback = usedFallback;
 		RegisterKnownPipelineStateLocked(pipeline.psoWithReplacement);
+		if (!rootSignatureOverride)
+			PersistAppliedStreamPipelineTemplate(replacement, pipeline, -1, shaderType, shaderHash);
 		gPipelineStateOverridesDirty = true;
-		ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12->RebuildStreamPSOWithReplacement: Applied stream shader replacement: " + replacement.name + (usedFallback ? " (null shader fallback)" : ""));
+		ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12->RebuildStreamPSOWithReplacement: Applied stream shader replacement: " + replacement.name + (usedFallback ? " (null shader fallback)" : "") + " durationMs=" + std::to_string(rebuildDurationMs));
 		return true;
 	}
 
@@ -1185,16 +1228,29 @@ namespace HookD3D12
 			ShaderInjectorGUI::WriteToRuntimeLog(std::string("HookD3D12->TryApplyPersistedStreamTemplateToUncaptured: Applied uncaptured PSO replacement from persisted stream template by ") + matchMethod + " using " + rootSignatureSource + ": " + replacement.name + templateLogSuffix);
 			return true;
 		};
+		const bool preferObservedRootSignature = matchMethod && strcmp(matchMethod, "verified cached blob content") == 0;
 
-		if (TryRebuildWithRootSignature(observedRootSignature, "observed command-list root signature"))
-			return true;
-
-		if (persistedRootSignature && persistedRootSignature != observedRootSignature)
+		if (preferObservedRootSignature && observedRootSignature)
 		{
-			if (observedRootSignature)
-				ShaderInjectorGUI::WriteToRuntimeLogWarning("HookD3D12->TryApplyPersistedStreamTemplateToUncaptured: Observed root signature rebuild failed; retrying persisted root signature blob: " + replacement.name + templateLogSuffix);
+			if (TryRebuildWithRootSignature(observedRootSignature, "observed command-list root signature"))
+				return true;
 
+			if (persistedRootSignature && persistedRootSignature != observedRootSignature)
+				ShaderInjectorGUI::WriteToRuntimeLogWarning("HookD3D12->TryApplyPersistedStreamTemplateToUncaptured: Observed root signature rebuild failed; retrying persisted root signature blob: " + replacement.name + templateLogSuffix);
+		}
+
+		if (persistedRootSignature && (!preferObservedRootSignature || persistedRootSignature != observedRootSignature))
+		{
 			if (TryRebuildWithRootSignature(persistedRootSignature, "persisted root signature blob"))
+				return true;
+		}
+
+		if (!preferObservedRootSignature && observedRootSignature && observedRootSignature != persistedRootSignature)
+		{
+			if (persistedRootSignature)
+				ShaderInjectorGUI::WriteToRuntimeLogWarning("HookD3D12->TryApplyPersistedStreamTemplateToUncaptured: Persisted root signature rebuild failed; retrying observed command-list root signature: " + replacement.name + templateLogSuffix);
+
+			if (TryRebuildWithRootSignature(observedRootSignature, "observed command-list root signature"))
 				return true;
 		}
 
@@ -1206,6 +1262,9 @@ namespace HookD3D12
 
 	bool TryApplyUncapturedReplacement(UncapturedPipelineStateInfo& uncaptured)
 	{
+		if (uncaptured.attemptedReplacement || uncaptured.replacementPipelineState)
+			return false;
+
 		if (!uncaptured.pipelineState || !uncaptured.cachedBlobHash)
 			return false;
 
@@ -1267,6 +1326,12 @@ namespace HookD3D12
 		{
 			uncaptured.attemptedReplacement = true;
 			return false;
+		}
+
+		if ((replacement.sourceList == "Stream" || !replacement.pipelineStreamBlobPath.empty()) &&
+			TryApplyPersistedStreamTemplateToUncaptured(uncaptured, replacementIndex, shaderHash, replacement.shaderType, matchMethod))
+		{
+			return true;
 		}
 
 		if (replacement.sourceList == "Graphics" && !replacement.pipelineIndex.empty())
@@ -1336,13 +1401,6 @@ namespace HookD3D12
 				return true;
 			}
 		}
-
-		if ((replacement.sourceList == "Stream" || !replacement.pipelineStreamBlobPath.empty()) &&
-			TryApplyPersistedStreamTemplateToUncaptured(uncaptured, replacementIndex, shaderHash, replacement.shaderType, matchMethod))
-		{
-			return true;
-		}
-
 		uncaptured.attemptedReplacement = true;
 		ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12->TryApplyUncapturedReplacement: Uncaptured PSO matched replacement cached blob, but no rebuild template is currently available: " + replacement.name);
 		return false;
@@ -1350,6 +1408,9 @@ namespace HookD3D12
 
 	void ApplyShaderTargetPSOs()
 	{
+		if (!IsPipelineActivityQuiet())
+			return;
+
 		ShaderAutomaticDiscovery::ProcessQueuedWork(1);
 
 		if (!Globals::gShaderInjectorEnabled)
@@ -1369,14 +1430,25 @@ namespace HookD3D12
 		for (auto& pipeline : gPipelineStates)
 			TryApplyStreamReplacement(pipeline);
 
+		int uncapturedAttemptsThisFrame = 0;
+		bool hasDeferredUncapturedWork = false;
 		for (auto& uncaptured : gUncapturedPipelineStates)
 		{
-			if (!uncaptured.replacementPipelineState)
-				TryApplyUncapturedReplacement(uncaptured);
+			if (uncaptured.replacementPipelineState || uncaptured.attemptedReplacement)
+				continue;
+
+			if (uncapturedAttemptsThisFrame >= gMaximumUncapturedReplacementAttemptsPerFrame)
+			{
+				hasDeferredUncapturedWork = true;
+				continue;
+			}
+
+			TryApplyUncapturedReplacement(uncaptured);
+			uncapturedAttemptsThisFrame++;
 		}
 
 		RebuildPipelineStateOverrideMap();
-		gShaderTargetApplyDirty = false;
+		gShaderTargetApplyDirty = hasDeferredUncapturedWork;
 	}
 
 	void ProcessPendingRebuilds()

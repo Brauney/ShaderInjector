@@ -1,9 +1,11 @@
 //HookD3D12ReplacementCreation.cpp
 #include <cstdint>
+#include <algorithm>
 #include <string>
 #include <vector>
 
 //custom
+#include "DatabaseModifiedShaders.h"
 #include "HookD3D12.h"
 #include "HookD3D12PipelineUtils.h"
 #include "HookD3D12ReplacementLookup.h"
@@ -30,7 +32,8 @@ namespace HookD3D12
 			const GraphicsPipelineInfo* graphicsInfo,
 			const PipelineStateInfo* streamInfo,
 			const std::string& modifiedShaderId,
-			bool generateShaderDisassembly)
+			bool generateShaderDisassembly,
+			const ShaderAnalysis::ShaderAnalysisDisk* originalShaderAnalysis)
 		{
 			if (!shaderHash || !shaderBytecode || shaderBytecodeLength == 0)
 			{
@@ -38,6 +41,7 @@ namespace HookD3D12
 				return false;
 			}
 
+			const ULONGLONG creationStartTick = GetTickCount64();
 			const std::string hashText = Hash::FormatHash(shaderHash);
 			const std::string shaderTypeText = StringHelper::ShaderTypeToString(shaderType);
 			const std::string replacementName = "ShaderTarget_" + shaderTypeText + "_" + hashText;
@@ -66,8 +70,14 @@ namespace HookD3D12
 			replacement.replacementDirectory = replacementDirectory;
 			replacement.originalShaderBlobPath = ShaderInjectorIO::JoinPath(replacementDirectory, "OriginalShaderBytecode" + ShaderInjectorIO::extensionBIN);
 			replacement.modifiedShaderId = modifiedShaderId;
+			const ModifiedShader::PackageDisk* modifiedShader = DatabaseModifiedShaders::FindModifiedShaderById(modifiedShaderId);
+			replacement.modifiedShaderBlobPath = modifiedShader ? modifiedShader->compiledBlobPath : "";
 
-			if (!ShaderAnalyzer::Analyze(shaderBytecode, shaderBytecodeLength, replacement.originalShaderAnalysis))
+			if (originalShaderAnalysis && originalShaderAnalysis->succeeded)
+			{
+				replacement.originalShaderAnalysis = *originalShaderAnalysis;
+			}
+			else if (!ShaderAnalyzer::Analyze(shaderBytecode, shaderBytecodeLength, replacement.originalShaderAnalysis))
 			{
 				ShaderInjectorGUI::WriteToRuntimeLogError(
 					"HookD3D12ReplacementCreation->CreateReplacementShaderTemplate: shader analysis unavailable for " +
@@ -144,6 +154,12 @@ namespace HookD3D12
 
 				if (!streamInfo->dsBytecode.empty())
 					replacement.domainShaderBlobPath = ShaderInjectorIO::JoinPath(replacementDirectory, "OriginalDomainShaderBytecode" + ShaderInjectorIO::extensionBIN);
+
+				if (!streamInfo->asBytecode.empty())
+					replacement.amplificationShaderBlobPath = ShaderInjectorIO::JoinPath(replacementDirectory, "OriginalAmplificationShaderBytecode" + ShaderInjectorIO::extensionBIN);
+
+				if (!streamInfo->msBytecode.empty())
+					replacement.meshShaderBlobPath = ShaderInjectorIO::JoinPath(replacementDirectory, "OriginalMeshShaderBytecode" + ShaderInjectorIO::extensionBIN);
 			}
 
 			bool ok = true;
@@ -187,8 +203,11 @@ namespace HookD3D12
 			if (streamInfo && !streamInfo->dsBytecode.empty() && !replacement.domainShaderBlobPath.empty())
 				ok = ShaderInjectorIO::WriteBinaryFile(replacement.domainShaderBlobPath, streamInfo->dsBytecode.data(), streamInfo->dsBytecode.size()) && ok;
 
-			if (streamInfo)
-				WriteMatchingStreamPipelineTemplateVariants(replacement, shaderType, shaderHash, ok);
+			if (streamInfo && !streamInfo->asBytecode.empty() && !replacement.amplificationShaderBlobPath.empty())
+				ok = ShaderInjectorIO::WriteBinaryFile(replacement.amplificationShaderBlobPath, streamInfo->asBytecode.data(), streamInfo->asBytecode.size()) && ok;
+
+			if (streamInfo && !streamInfo->msBytecode.empty() && !replacement.meshShaderBlobPath.empty())
+				ok = ShaderInjectorIO::WriteBinaryFile(replacement.meshShaderBlobPath, streamInfo->msBytecode.data(), streamInfo->msBytecode.size()) && ok;
 
 			if (generateShaderDisassembly)
 				ok = ShaderInjectorIO::GenerateShaderTextDXIL(replacement.originalShaderBlobPath) && ok;
@@ -200,8 +219,29 @@ namespace HookD3D12
 				return false;
 			}
 
-			ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12ReplacementCreation->CreateReplacementShaderTemplate: Created replacement shader template: " + replacement.jsonPath);
-			gLoadedShaderTargetsOnce = false;
+			const ULONGLONG creationDurationMs = GetTickCount64() - creationStartTick;
+			ShaderInjectorGUI::WriteToRuntimeLog("HookD3D12ReplacementCreation->CreateReplacementShaderTemplate: Created replacement shader template: " + replacement.jsonPath + " durationMs=" + std::to_string(creationDurationMs));
+			if (gLoadedShaderTargetsOnce)
+			{
+				const auto existingTarget = std::find_if(gLoadedShaderTargets.begin(), gLoadedShaderTargets.end(),
+					[&replacement](const ShaderTarget::ShaderTargetDisk& loadedTarget)
+				{
+					return loadedTarget.jsonPath == replacement.jsonPath ||
+						(loadedTarget.shaderType == replacement.shaderType &&
+							loadedTarget.originalShaderBytecodeHash == replacement.originalShaderBytecodeHash);
+				});
+
+				if (existingTarget == gLoadedShaderTargets.end())
+				{
+					std::vector<uint8_t> compiledReplacementBlob;
+					if (modifiedShader && modifiedShader->enabled && modifiedShader->shaderType == replacement.shaderType)
+						compiledReplacementBlob = modifiedShader->compiledBlob;
+
+					gLoadedShaderTargets.push_back(replacement);
+					gLoadedShaderTargetBlobs.push_back(std::move(compiledReplacementBlob));
+				}
+			}
+
 			MarkShaderTargetApplyDirty();
 			return true;
 		}
@@ -216,9 +256,10 @@ namespace HookD3D12
 		const void* shaderBytecode,
 		GraphicsPipelineInfo& pipeline,
 		const std::string& modifiedShaderId,
-		bool generateShaderDisassembly)
+		bool generateShaderDisassembly,
+		const ShaderAnalysis::ShaderAnalysisDisk* originalShaderAnalysis)
 	{
-		return CreateShaderTarget(sourceList, pipelineIndex, shaderType, shaderHash, shaderBytecodeLength, shaderBytecode, pipeline.pipelineState, &pipeline, nullptr, modifiedShaderId, generateShaderDisassembly);
+		return CreateShaderTarget(sourceList, pipelineIndex, shaderType, shaderHash, shaderBytecodeLength, shaderBytecode, pipeline.pipelineState, &pipeline, nullptr, modifiedShaderId, generateShaderDisassembly, originalShaderAnalysis);
 	}
 
 	bool CreateShaderTargetForPipeline(
@@ -230,8 +271,9 @@ namespace HookD3D12
 		const void* shaderBytecode,
 		PipelineStateInfo& pipeline,
 		const std::string& modifiedShaderId,
-		bool generateShaderDisassembly)
+		bool generateShaderDisassembly,
+		const ShaderAnalysis::ShaderAnalysisDisk* originalShaderAnalysis)
 	{
-		return CreateShaderTarget(sourceList, pipelineIndex, shaderType, shaderHash, shaderBytecodeLength, shaderBytecode, pipeline.pipelineState, nullptr, &pipeline, modifiedShaderId, generateShaderDisassembly);
+		return CreateShaderTarget(sourceList, pipelineIndex, shaderType, shaderHash, shaderBytecodeLength, shaderBytecode, pipeline.pipelineState, nullptr, &pipeline, modifiedShaderId, generateShaderDisassembly, originalShaderAnalysis);
 	}
 }

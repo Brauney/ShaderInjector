@@ -38,5 +38,6 @@ namespace ShaderDiscovery
 		uint64_t shaderHash,
 		ShaderTarget::ShaderType shaderType,
 		const std::vector<uint8_t>& shaderBytecode,
-		const std::vector<ModifiedShader::PackageDisk>& modifiedShaders);
+		const std::vector<ModifiedShader::PackageDisk>& modifiedShaders,
+		ShaderAnalysis::ShaderAnalysisDisk* outCandidateAnalysis = nullptr);
 }
