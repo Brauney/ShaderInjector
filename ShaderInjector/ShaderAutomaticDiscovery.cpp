@@ -368,6 +368,8 @@ namespace ShaderAutomaticDiscovery
 			{
 				if (!force)
 				{
+					gSubmittedShaders.erase(key);
+
 					ShaderInjectorGUI::WriteToRuntimeLogError(
 						"ShaderAutomaticDiscovery->Enqueue: queue full, dropping shader hash=" +
 						Hash::FormatHash(shaderHash) +
