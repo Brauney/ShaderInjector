@@ -33,16 +33,12 @@ namespace CrossVersionDiscoveryTest
 		double secondBestFuzzyScore = 0.0;
 	};
 
-	// Mirrors ShaderDiscovery.cpp HasPlausibleByteLength (±5%, lines 52-65).
 	bool HasPlausibleReplacementByteLength(size_t candidateLength, const ShaderTarget::ShaderTargetDisk& replacement);
 
-	// Mirrors ShaderDiscovery.cpp HasStrictCrossVersionIdentity (lines 67-73).
 	bool HasStrictCrossVersionIdentity(const ShaderAnalysis::ShaderAnalysisDisk& analysis);
 
-	// Mirrors ShaderAutomaticDiscovery.cpp byteLengthTolerancePercent=15 (lines 98-141).
 	bool WouldEnqueueByByteLength(ShaderTarget::ShaderType shaderType, size_t byteLength, const std::vector<size_t>& knownTargetLengths);
 
-	// Mirrors DiscoverEnabledReplacement decision path without ShaderAnalyzer/GUI/runtime cache.
 	ReplacementMatchResult EvaluateReplacementDiscovery(
 		uint64_t shaderHash,
 		ShaderTarget::ShaderType shaderType,
@@ -50,7 +46,6 @@ namespace CrossVersionDiscoveryTest
 		const ShaderAnalysis::ShaderAnalysisDisk& candidateAnalysis,
 		const std::vector<ShaderTarget::ShaderTargetDisk>& replacements);
 
-	// Mirrors DiscoverEnabledModifiedShader hash + analysis paths without ShaderAnalyzer/GUI/runtime cache.
 	ModifiedShaderMatchResult EvaluateModifiedShaderDiscovery(
 		uint64_t shaderHash,
 		ShaderTarget::ShaderType shaderType,
