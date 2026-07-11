@@ -380,7 +380,11 @@ namespace ShaderAnalyzer
 		}
 	}
 
-	bool Analyze(const void* bytecode, size_t bytecodeLength, ShaderAnalysis::ShaderAnalysisDisk& outAnalysis)
+	bool Analyze(
+		const void* bytecode,
+		size_t bytecodeLength,
+		ShaderAnalysis::ShaderAnalysisDisk& outAnalysis,
+		const std::unordered_set<std::string>* acceptablePortableReflectionHashes)
 	{
 		// DXC may also be used by template creation and cached-PSO discovery on game
 		// threads. Keep all reflection/disassembly work single-file across the process.
@@ -603,19 +607,33 @@ namespace ShaderAnalyzer
 		outAnalysis.constantBufferSignatureHash = BuildConstantBufferFingerprint(outAnalysis.constantBuffers);
 		outAnalysis.instructionStatisticsHash = BuildInstructionFingerprint(outAnalysis.instructionStatistics);
 		outAnalysis.executionSignatureHash = BuildExecutionFingerprint(outAnalysis.executionProperties);
-		AnalyzeSemanticInstructions(createInstance, shaderBlob.Get(), outAnalysis);
 
+		// portableReflectionIdentityHash only needs the structured reflection data gathered
+		// above - no disassembly required - so it's available here as a cheap pre-filter before
+		// the expensive full-disassembly step below.
 		std::ostringstream portableReflectionIdentity;
 		portableReflectionIdentity << outAnalysis.shaderStage << ':' << outAnalysis.shaderModelMajor << ':' << outAnalysis.shaderModelMinor << ':'
 			<< outAnalysis.interfaceSignatureHash << ':' << outAnalysis.resourceSignatureHash << ':'
 			<< outAnalysis.constantBufferSignatureHash << ':' << outAnalysis.executionSignatureHash;
 		outAnalysis.portableReflectionIdentityHash = Fingerprint(portableReflectionIdentity.str());
 
-		if (!outAnalysis.semanticInstructionSetHash.empty())
+		// Cross-version matches always share an exact portableReflectionIdentityHash (this is
+		// already how the fuzzy replacement fallback gates its candidates). If nothing in the
+		// caller's candidate set shares this shader's reflection identity, it can never match, so
+		// skip the expensive disassembly and semantic hashing below entirely.
+		const bool skipDisassembly = acceptablePortableReflectionHashes &&
+			acceptablePortableReflectionHashes->find(outAnalysis.portableReflectionIdentityHash) ==
+				acceptablePortableReflectionHashes->end();
+
+		if (!skipDisassembly)
 		{
-			outAnalysis.crossVersionIdentityHash = Fingerprint(
-				outAnalysis.portableReflectionIdentityHash + ":" +
-				outAnalysis.entryFunctionName + ":" + outAnalysis.semanticInstructionSetHash);
+			AnalyzeSemanticInstructions(createInstance, shaderBlob.Get(), outAnalysis);
+			if (!outAnalysis.semanticInstructionSetHash.empty())
+			{
+				outAnalysis.crossVersionIdentityHash = Fingerprint(
+					outAnalysis.portableReflectionIdentityHash + ":" +
+					outAnalysis.entryFunctionName + ":" + outAnalysis.semanticInstructionSetHash);
+			}
 		}
 
 		std::ostringstream reflectionSignature;

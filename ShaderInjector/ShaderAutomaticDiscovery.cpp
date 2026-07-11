@@ -216,6 +216,14 @@ namespace ShaderAutomaticDiscovery
 			return (std::max)(0.0, 1.0 - (difference / largerLength));
 		}
 
+		double ShaderTypeQueuePriorityBonus(ShaderTarget::ShaderType shaderType)
+		{
+			// Prioritize pixel shader candidates over compute shaders or other shader types for now.
+			// Currently the mod uses far more pixel shaders and these make up the bulk of the rendering
+			// replacement work.
+			return shaderType == ShaderTarget::PixelShader ? 100.0 : 0.0;
+		}
+
 		double CalculateQueuePriorityLocked(
 			ShaderTarget::ShaderType shaderType,
 			size_t byteLength,
@@ -250,7 +258,7 @@ namespace ShaderAutomaticDiscovery
 
 			// Most cross-version matches are still close in byte size. This is deliberately
 			// only a queue ordering hint; the full bytecode analysis remains the authority.
-			return bestLengthSimilarity;
+			return ShaderTypeQueuePriorityBonus(shaderType) + bestLengthSimilarity;
 		}
 
 		std::deque<QueuedShader>::iterator FindLowestPriorityQueuedShaderLocked()
