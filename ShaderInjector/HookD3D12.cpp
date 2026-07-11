@@ -1411,7 +1411,7 @@ namespace HookD3D12
 		if (!IsPipelineActivityQuiet())
 			return;
 
-		ShaderAutomaticDiscovery::ProcessQueuedWork(1);
+		ShaderAutomaticDiscovery::ProcessQueuedWork(8192);
 
 		if (!Globals::gShaderInjectorEnabled)
 			return;

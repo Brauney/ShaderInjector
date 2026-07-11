@@ -41,7 +41,7 @@ namespace ShaderAutomaticDiscovery
 		const size_t analysisWorkerThreadCount = []()
 		{
 			const unsigned int detectedThreads = std::thread::hardware_concurrency();
-			return (std::clamp<size_t>)(detectedThreads > 0 ? detectedThreads / 2 : 4, 2, 8);
+			return (std::clamp<size_t>)(detectedThreads > 0 ? detectedThreads / 2 : 4, 2, 16);
 		}();
 
 		struct ShaderKey
