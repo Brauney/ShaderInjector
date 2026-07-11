@@ -1,6 +1,7 @@
 #include "ShaderAutomaticDiscovery.h"
 
 #include <deque>
+#include <vector>
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -30,6 +31,18 @@ namespace ShaderAutomaticDiscovery
 	{
 		constexpr size_t maximumQueuedShaders = 8192;
 		constexpr size_t maximumPendingAnalyses = 64;
+		// Multiple threads let the background pool analyze several candidate shaders at the same
+		// time instead of one every ~2 seconds, which matters a lot on game patches where the
+		// real target shaders are buried behind many false candidates that all need analyzing
+		// before a match is found. This scales with the machine's core count instead of a fixed
+		// number so faster CPUs get faster discovery, but only uses half the detected threads
+		// (clamped to a sane [2, 8] range) so the mod stays a "good citizen" and doesn't compete
+		// with the game itself - which is still doing the real work of rendering - for every core.
+		const size_t analysisWorkerThreadCount = []()
+		{
+			const unsigned int detectedThreads = std::thread::hardware_concurrency();
+			return (std::clamp<size_t>)(detectedThreads > 0 ? detectedThreads / 2 : 4, 2, 8);
+		}();
 
 		struct ShaderKey
 		{
@@ -97,8 +110,9 @@ namespace ShaderAutomaticDiscovery
 		constexpr uint64_t progressLogCompletedStep = 25;
 		constexpr uint64_t progressLogQueuedStep = 100;
 		std::condition_variable gAnalysisCondition;
-		std::thread* gAnalysisWorker = nullptr;
+		std::vector<std::thread> gAnalysisWorkers;
 		bool gAnalysisWorkerRunning = false;
+		size_t gRunningAnalysisWorkerCount = 0;
 		bool gAnalysisStopRequested = false;
 		bool gAcceptingWork = true;
 		size_t gActiveAnalysisJobs = 0;
@@ -674,8 +688,11 @@ namespace ShaderAutomaticDiscovery
 			if (SUCCEEDED(comInitializationResult))
 				CoUninitialize();
 
+			// Last thread exiting must not clear gAnalysisWorkerRunning while others are still alive.
 			std::lock_guard<std::mutex> lock(gQueueMutex);
-			gAnalysisWorkerRunning = false;
+			if (gRunningAnalysisWorkerCount > 0)
+				--gRunningAnalysisWorkerCount;
+			gAnalysisWorkerRunning = gRunningAnalysisWorkerCount > 0;
 		}
 
 		void EnsureAnalysisWorkerStartedLocked()
@@ -684,8 +701,13 @@ namespace ShaderAutomaticDiscovery
 				return;
 
 			gAnalysisStopRequested = false;
+			gAnalysisWorkers.reserve(analysisWorkerThreadCount);
+			for (size_t workerIndex = 0; workerIndex < analysisWorkerThreadCount; ++workerIndex)
+			{
+				++gRunningAnalysisWorkerCount;
+				gAnalysisWorkers.emplace_back(AnalysisWorkerMain);
+			}
 			gAnalysisWorkerRunning = true;
-			gAnalysisWorker = new std::thread(AnalysisWorkerMain);
 		}
 
 		bool TrySubmitAnalysis(QueuedShader& queued)
@@ -846,7 +868,7 @@ namespace ShaderAutomaticDiscovery
 			ProcessMatchedShader(result.queuedShader, result.modifiedShaderId, &result.shaderAnalysis);
 		}
 
-		// Submit a bounded amount of new work each frame. The worker processes jobs serially.
+		// Submit a bounded amount of new work each frame. Background workers process jobs concurrently.
 		for (size_t submittedJobs = 0; submittedJobs < maximumJobs; ++submittedJobs)
 		{
 			QueuedShader queued{};
@@ -883,7 +905,7 @@ namespace ShaderAutomaticDiscovery
 
 	void Shutdown()
 	{
-		std::thread* worker = nullptr;
+		std::vector<std::thread> workers;
 		{
 			std::lock_guard<std::mutex> lock(gQueueMutex);
 			gAcceptingWork = false;
@@ -894,22 +916,24 @@ namespace ShaderAutomaticDiscovery
 			gDirectMatchShaders.clear();
 			gModifiedShaderAnalysisSnapshot.reset();
 
-			if (!gAnalysisWorker)
+			if (gAnalysisWorkers.empty())
 				return;
 
 			gAnalysisStopRequested = true;
-			worker = gAnalysisWorker;
+			workers = std::move(gAnalysisWorkers);
 			gAnalysisCondition.notify_all();
 		}
 
-		if (worker->joinable())
-			worker->join();
+		for (std::thread& worker : workers)
+		{
+			if (worker.joinable())
+				worker.join();
+		}
 
 		{
 			std::lock_guard<std::mutex> lock(gQueueMutex);
-			delete gAnalysisWorker;
-			gAnalysisWorker = nullptr;
 			gAnalysisWorkerRunning = false;
+			gRunningAnalysisWorkerCount = 0;
 		}
 	}
 
