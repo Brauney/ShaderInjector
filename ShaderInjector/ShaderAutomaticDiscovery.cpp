@@ -95,7 +95,11 @@ namespace ShaderAutomaticDiscovery
 		bool gAnalysisWorkerRunning = false;
 		bool gAnalysisStopRequested = false;
 		bool gAcceptingWork = true;
-		constexpr size_t byteLengthTolerancePercent = 15;
+		// Newer game patches tend to compile shaders slightly smaller than the version a mod
+		// package was originally built against, so the lower bound gets more slack than the
+		// upper bound.
+		constexpr size_t byteLengthLowerTolerancePercent = 35;
+		constexpr size_t byteLengthUpperTolerancePercent = 15;
 
 		bool ParseByteLength(const std::string& byteLengthText, size_t& outByteLength)
 		{
@@ -117,10 +121,35 @@ namespace ShaderAutomaticDiscovery
 			if (shaderTypeIndex >= static_cast<size_t>(ShaderTarget::Unknown) || byteLength == 0)
 				return;
 
-			const size_t tolerance = (std::max<size_t>)(1, (byteLength * byteLengthTolerancePercent) / 100);
-			const size_t minimumLength = byteLength > tolerance ? byteLength - tolerance : 1;
-			const size_t maximumLength = byteLength + tolerance;
+			const size_t lowerTolerance = (std::max<size_t>)(1, (byteLength * byteLengthLowerTolerancePercent) / 100);
+			const size_t upperTolerance = (std::max<size_t>)(1, (byteLength * byteLengthUpperTolerancePercent) / 100);
+			const size_t minimumLength = byteLength > lowerTolerance ? byteLength - lowerTolerance : 1;
+			const size_t maximumLength = byteLength + upperTolerance;
 			gPlausibleByteLengthRanges[shaderTypeIndex].push_back({ minimumLength, maximumLength });
+		}
+
+		// Combines overlapping ranges into one sorted list per shader type, so lookups can use
+		// binary search instead of checking every range one by one.
+		void MergePlausibleByteLengthRanges()
+		{
+			for (auto& ranges : gPlausibleByteLengthRanges)
+			{
+				if (ranges.size() < 2)
+					continue;
+
+				std::sort(ranges.begin(), ranges.end());
+
+				std::vector<std::pair<size_t, size_t>> merged;
+				merged.reserve(ranges.size());
+				for (const auto& range : ranges)
+				{
+					if (!merged.empty() && range.first <= merged.back().second)
+						merged.back().second = (std::max)(merged.back().second, range.second);
+					else
+						merged.push_back(range);
+				}
+				ranges = std::move(merged);
+			}
 		}
 
 		bool HasPlausibleByteLength(ShaderTarget::ShaderType shaderType, size_t byteLength)
@@ -133,12 +162,13 @@ namespace ShaderAutomaticDiscovery
 			if (ranges.empty())
 				return true;
 
-			for (const auto& range : ranges)
-			{
-				if (byteLength >= range.first && byteLength <= range.second)
-					return true;
-			}
-			return false;
+			// Find the last range that starts at or before byteLength, then check if it fits inside it.
+			const auto it = std::upper_bound(ranges.begin(), ranges.end(), byteLength,
+				[](size_t value, const std::pair<size_t, size_t>& range) { return value < range.first; });
+			if (it == ranges.begin())
+				return false;
+			const auto& candidate = *std::prev(it);
+			return byteLength >= candidate.first && byteLength <= candidate.second;
 		}
 
 		bool TargetContainsHash(const ShaderTarget::ShaderTargetDisk& target, uint64_t shaderHash)
@@ -583,6 +613,8 @@ namespace ShaderAutomaticDiscovery
 				}
 			}
 		}
+
+		MergePlausibleByteLengthRanges();
 	}
 
 	void ProcessQueuedWork(size_t maximumJobs)
