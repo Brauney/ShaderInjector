@@ -1101,17 +1101,74 @@ namespace HookD3D12
 		HRESULT hr = CreatePipelineStateInternal(device2, &patchedDesc, IID_PPV_ARGS(&rebuiltPipelineState));
 		const ULONGLONG rebuildDurationMs = GetTickCount64() - rebuildStartTick;
 
-		device2->Release();
-
 		if (FAILED(hr) || !rebuiltPipelineState)
 		{
 			if (rebuiltPipelineState)
 				rebuiltPipelineState->Release();
 
-			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12->RebuildStreamPSOWithReplacement: failed hr=" + std::to_string((unsigned)hr) + " replacement=" + replacement.name + " streamBytes=" + std::to_string(patchedBlob.size()) + " root=" + StringHelper::PointerToString(rootSignatureOverride) + " vsBytes=" + std::to_string(pipeline.vsBytecode.size()) + " psBytes=" + std::to_string(pipeline.psBytecode.size()) + " inputElements=" + std::to_string(pipeline.inputElements.size()));
+			bool attemptedOriginalValidation = false;
+			bool originalValidationSucceeded = false;
+			HRESULT originalValidationHr = E_FAIL;
+			const std::vector<uint8_t>* originalTargetBytecode = originalShaderForType(targetType);
+			if (originalTargetBytecode && !originalTargetBytecode->empty())
+			{
+				attemptedOriginalValidation = true;
+				std::vector<uint8_t> originalValidationBlob = patchedBlob;
+				uint8_t* validationPtr = originalValidationBlob.data();
+				uint8_t* validationEnd = validationPtr + originalValidationBlob.size();
+				while (validationPtr < validationEnd)
+				{
+					if (validationPtr + sizeof(D3D12_PIPELINE_STATE_SUBOBJECT_TYPE) > validationEnd)
+						break;
+
+					auto validationType = *reinterpret_cast<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE*>(validationPtr);
+					UINT validationTypeIndex = (UINT)validationType;
+					if (validationTypeIndex >= ARRAYSIZE(kSubobjectSizes))
+						break;
+
+					size_t validationSubobjectSize = kSubobjectSizes[validationTypeIndex];
+					if (validationPtr + validationSubobjectSize > validationEnd)
+						break;
+
+					if (validationType == targetType)
+					{
+						D3D12_SHADER_BYTECODE* validationBytecode = reinterpret_cast<D3D12_SHADER_BYTECODE*>(validationPtr + sizeof(void*));
+						validationBytecode->pShaderBytecode = originalTargetBytecode->data();
+						validationBytecode->BytecodeLength = originalTargetBytecode->size();
+						break;
+					}
+
+					validationPtr += validationSubobjectSize;
+				}
+
+				D3D12_PIPELINE_STATE_STREAM_DESC originalValidationDesc{};
+				originalValidationDesc.pPipelineStateSubobjectStream = originalValidationBlob.data();
+				originalValidationDesc.SizeInBytes = originalValidationBlob.size();
+				ID3D12PipelineState* originalValidationPipelineState = nullptr;
+				originalValidationHr = CreatePipelineStateInternal(device2, &originalValidationDesc, IID_PPV_ARGS(&originalValidationPipelineState));
+				originalValidationSucceeded = SUCCEEDED(originalValidationHr) && originalValidationPipelineState;
+				if (originalValidationPipelineState)
+					originalValidationPipelineState->Release();
+			}
+
+			device2->Release();
+
+			ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12->RebuildStreamPSOWithReplacement: failed hr=" + std::to_string((unsigned)hr) + " replacement=" + replacement.name + " streamBytes=" + std::to_string(patchedBlob.size()) + " root=" + StringHelper::PointerToString(rootSignatureOverride) + " targetType=" + StringHelper::ShaderTypeToString(shaderType) + " replacementBytes=" + std::to_string(replacementBytecodeSize) + " originalTargetBytes=" + std::to_string(originalTargetBytecode ? originalTargetBytecode->size() : 0) + " vsBytes=" + std::to_string(pipeline.vsBytecode.size()) + " psBytes=" + std::to_string(pipeline.psBytecode.size()) + " inputElements=" + std::to_string(pipeline.inputElements.size()));
+			if (attemptedOriginalValidation)
+			{
+				if (originalValidationSucceeded)
+				{
+					ShaderInjectorGUI::WriteToRuntimeLogError("HookD3D12->RebuildStreamPSOWithReplacement: original-bytecode validation succeeded; replacement shader bytecode is incompatible with this PSO/root signature: " + replacement.name);
+				}
+				else
+				{
+					ShaderInjectorGUI::WriteToRuntimeLogWarning("HookD3D12->RebuildStreamPSOWithReplacement: original-bytecode validation also failed hr=" + std::to_string((unsigned)originalValidationHr) + "; suspect captured stream/template metadata or root signature for " + replacement.name);
+				}
+			}
 			return false;
 		}
 
+		device2->Release();
 		RetirePipelineState(pipeline.psoWithReplacement);
 		pipeline.psoWithReplacement = rebuiltPipelineState;
 		pipeline.activeShaderTargetName = replacement.name;
