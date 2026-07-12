@@ -533,7 +533,13 @@ namespace ShaderAutomaticDiscovery
 			const auto directMatchIterator = gDirectMatchShaders.find(key);
 			const bool directMatch = directMatchIterator != gDirectMatchShaders.end() &&
 				!directMatchIterator->second.empty();
-			if (!force && !directMatch && !HasPlausibleByteLength(shaderType, shaderBytecode.size()))
+			// PSOs are only ever created once by the game and never recreated, so this is the
+			// only chance a shader ever gets to be queued - anything rejected here is gone for
+			// the rest of the session. PixelShaders are rare enough (unlike ComputeShaders, which
+			// this filter genuinely needs to hold back) that there's no reason to risk losing one
+			// forever over a byte-length guess; let full analysis be the only judge for them.
+			if (!force && !directMatch && shaderType != ShaderTarget::PixelShader &&
+				!HasPlausibleByteLength(shaderType, shaderBytecode.size()))
 			{
 				++gByteLengthRejectedTotal;
 				return true;
@@ -565,7 +571,12 @@ namespace ShaderAutomaticDiscovery
 					return false;
 				}
 
-				if (!force && queuePriority <= lowestPriorityIterator->priority)
+				// Same one-shot reasoning as the byte-length gate above: a PixelShader that gets
+				// dropped here never gets a second chance. PixelShaders are rare enough that it's
+				// always worth evicting whatever the current lowest-priority queued shader is
+				// (almost always a ComputeShader) to make room, rather than risking losing this
+				// one forever.
+				if (!force && shaderType != ShaderTarget::PixelShader && queuePriority <= lowestPriorityIterator->priority)
 				{
 					gSubmittedShaders.erase(key);
 					++gQueueDroppedTotal;
