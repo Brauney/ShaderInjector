@@ -198,6 +198,7 @@
     <ClInclude Include="ShaderTemplates.h" />
     <ClInclude Include="ShaderInjectorGUI.h" />
     <ClInclude Include="StringHelper.h" />
+    <ClInclude Include="SystemInfoLogger.h" />
     <ClInclude Include="VTableIndex.h" />
   </ItemGroup>
   <ItemGroup>
@@ -243,6 +244,7 @@
     <ClCompile Include="ShaderTemplates.cpp" />
     <ClCompile Include="ShaderInjectorGUI.cpp" />
     <ClCompile Include="StringHelper.cpp" />
+    <ClCompile Include="SystemInfoLogger.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="ShaderInjector.rc" />

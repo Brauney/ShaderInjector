@@ -27,6 +27,7 @@ namespace ShaderInjectorIO
 	bool DirectoryExists(const std::string& path);
 	void DirectoryCreate(const std::string& path);
 	bool DeleteDirectoryRecursively(const std::string& path);
+	bool MovePath(const std::string& sourcePath, const std::string& destinationPath, bool overwriteExisting = false);
 	bool OpenDirectory(const std::string& path);
 	std::string JoinPath(const std::string& directory, const std::string& childPath);
 	std::string DirectoryFromPath(const std::string& path);
@@ -47,6 +48,7 @@ namespace ShaderInjectorIO
 	std::string GetToolPathDXCompiler();
 	std::string GetShaderTargetsDirectory();
 	std::string GetModifiedShadersDirectory();
+	std::string GetModifiedShadersIncludesDirectory();
 	std::string GetInjectorSettingsPath();
 
 	//logs

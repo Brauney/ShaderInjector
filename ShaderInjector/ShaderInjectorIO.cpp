@@ -169,6 +169,62 @@ namespace ShaderInjectorIO
 		return !error && !PathExists(directoryPath);
 	}
 
+	bool MovePath(const std::string& sourcePath, const std::string& destinationPath, bool overwriteExisting)
+	{
+		if (sourcePath.empty() || destinationPath.empty())
+			return false;
+
+		const FileSystem::path source = PathFromUtf8(sourcePath);
+		const FileSystem::path destination = PathFromUtf8(destinationPath);
+
+		if (source == destination)
+			return true;
+
+		std::error_code error;
+		if (!FileSystem::exists(source, error))
+			return false;
+
+		error.clear();
+		if (FileSystem::exists(destination, error))
+		{
+			if (!overwriteExisting)
+				return false;
+
+			error.clear();
+			if (FileSystem::is_directory(destination, error))
+				FileSystem::remove_all(destination, error);
+			else
+				FileSystem::remove(destination, error);
+
+			if (error)
+				return false;
+		}
+
+		error.clear();
+		FileSystem::create_directories(destination.parent_path(), error);
+		if (error)
+			return false;
+
+		error.clear();
+		FileSystem::rename(source, destination, error);
+		if (!error)
+			return true;
+
+		// Some Wine/Proton-backed paths are fussy about rename. For files, fall back
+		// to copy+remove so users can still migrate package metadata cleanly.
+		error.clear();
+		if (!FileSystem::is_regular_file(source, error))
+			return false;
+
+		error.clear();
+		if (!FileSystem::copy_file(source, destination, FileSystem::copy_options::none, error))
+			return false;
+
+		error.clear();
+		FileSystem::remove(source, error);
+		return !error && FileSystem::exists(destination, error);
+	}
+
 	bool OpenDirectory(const std::string& directoryPath)
 	{
 		if (!DirectoryExists(directoryPath))
@@ -355,6 +411,11 @@ namespace ShaderInjectorIO
 		return JoinPath(GetShaderInjectorDirectory(), "ModifiedShaders");
 	}
 
+	std::string GetModifiedShadersIncludesDirectory()
+	{
+		return JoinPath(GetModifiedShadersDirectory(), "Includes");
+	}
+
 	std::string GetInjectorSettingsPath()
 	{
 		return JoinPath(GetGameDirectory(), injectorSettingsName);
@@ -527,9 +588,21 @@ namespace ShaderInjectorIO
 		const std::string temporaryBlobPath = outBlobPath + ".compiling";
 		DeleteFileIfExists(temporaryBlobPath);
 
+		const std::string shaderSourceDirectory = DirectoryFromPath(shaderSourceFilePath);
+		const std::string modifiedShaderIncludesDirectory = GetModifiedShadersIncludesDirectory();
+		std::vector<std::string> dxcArguments =
+		{
+			"-T", shaderProfile,
+			"-E", entryPoint,
+			"-I", shaderSourceDirectory,
+			"-I", modifiedShaderIncludesDirectory,
+			shaderSourceFilePath,
+			"-Fo", temporaryBlobPath
+		};
+
 		const ProcessRunner::ProcessResult processResult = ProcessRunner::Run(
 			dxcPath,
-			{ "-T", shaderProfile, "-E", entryPoint, shaderSourceFilePath, "-Fo", temporaryBlobPath });
+			dxcArguments);
 
 		if (!processResult.Succeeded())
 		{
@@ -779,6 +852,7 @@ namespace ShaderInjectorIO
 		std::string uncapturedPSODirectory = GetUncapturedPSODirectory();
 		std::string shaderTargetsDirectory = GetShaderTargetsDirectory();
 		std::string modifiedShadersDirectory = GetModifiedShadersDirectory();
+		std::string modifiedShadersIncludesDirectory = GetModifiedShadersIncludesDirectory();
 		std::string injectorSettingsPath = GetInjectorSettingsPath();
 
 		//========================= INJECTOR SETTINGS =========================
@@ -837,6 +911,12 @@ namespace ShaderInjectorIO
 		{
 			DirectoryCreate(modifiedShadersDirectory);
 			WriteToLogFileWarning("ShaderInjectorIO->Initalize: " + modifiedShadersDirectory + " did not exist! Created anyway.");
+		}
+
+		if (!DirectoryExists(modifiedShadersIncludesDirectory))
+		{
+			DirectoryCreate(modifiedShadersIncludesDirectory);
+			WriteToLogFile("ShaderInjectorIO->Initalize: " + modifiedShadersIncludesDirectory + " did not exist! Created anyway.");
 		}
 
 		//========================= CREATE INTERNAL SHADER FILES =========================

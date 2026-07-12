@@ -1,7 +1,9 @@
 #include "DatabaseModifiedShaders.h"
 
 #include <algorithm>
+#include <cctype>
 #include <mutex>
+#include <string>
 #include <unordered_set>
 
 #include "ShaderInjectorIO.h"
@@ -12,6 +14,159 @@ namespace DatabaseModifiedShaders
 {
 	std::vector<ModifiedShader::PackageDisk> gModifiedShaders;
 	bool gModifiedShadersLoaded = false;
+
+	namespace
+	{
+		std::string TrimWhitespace(const std::string& text)
+		{
+			const size_t first = text.find_first_not_of(" \t\r\n");
+			if (first == std::string::npos)
+				return {};
+
+			const size_t last = text.find_last_not_of(" \t\r\n");
+			return text.substr(first, last - first + 1);
+		}
+
+		std::string LowercaseAscii(std::string text)
+		{
+			std::transform(text.begin(), text.end(), text.begin(), [](unsigned char character)
+			{
+				return static_cast<char>(std::tolower(character));
+			});
+			return text;
+		}
+
+		bool IsReservedWindowsFileName(const std::string& fileStem)
+		{
+			const std::string upper = LowercaseAscii(fileStem);
+			if (upper == "con" || upper == "prn" || upper == "aux" || upper == "nul")
+				return true;
+
+			if (upper.size() == 4 && (upper.rfind("com", 0) == 0 || upper.rfind("lpt", 0) == 0))
+				return upper[3] >= '1' && upper[3] <= '9';
+
+			return false;
+		}
+
+		std::string SanitizeFileStem(const std::string& name)
+		{
+			std::string fileStem = TrimWhitespace(name);
+
+			for (char& character : fileStem)
+			{
+				const unsigned char unsignedCharacter = static_cast<unsigned char>(character);
+				const bool invalidCharacter =
+					unsignedCharacter < 32 ||
+					character == '<' || character == '>' || character == ':' ||
+					character == '"' || character == '/' || character == '\\' ||
+					character == '|' || character == '?' || character == '*';
+
+				if (invalidCharacter)
+					character = '_';
+			}
+
+			while (!fileStem.empty() && (fileStem.back() == ' ' || fileStem.back() == '.'))
+				fileStem.pop_back();
+
+			if (IsReservedWindowsFileName(fileStem))
+				fileStem = "_" + fileStem;
+
+			return fileStem;
+		}
+
+		bool PathTextMatches(const std::string& left, const std::string& right)
+		{
+			return LowercaseAscii(left) == LowercaseAscii(right);
+		}
+
+		std::string JsonFileNameForStem(const std::string& fileStem)
+		{
+			return fileStem + "_Fingerprint" + ShaderInjectorIO::extensionJSON;
+		}
+
+		std::string SourceFileNameForStem(const std::string& fileStem)
+		{
+			return fileStem + "_Source" + ShaderInjectorIO::extensionHLSL;
+		}
+
+		std::string CompiledBlobFileNameForStem(const std::string& fileStem)
+		{
+			return fileStem + "_Compiled" + ShaderInjectorIO::extensionBLOB;
+		}
+
+		bool MoveExistingFileIfNeeded(const std::string& currentPath, const std::string& desiredPath, bool required)
+		{
+			if (PathTextMatches(currentPath, desiredPath))
+				return true;
+
+			if (!ShaderInjectorIO::FileExists(currentPath))
+				return !required;
+
+			if (ShaderInjectorIO::PathExists(desiredPath))
+				return false;
+
+			return ShaderInjectorIO::MovePath(currentPath, desiredPath);
+		}
+
+		bool MoveModifiedShaderPackageToName(ModifiedShader::PackageDisk& modifiedShader, const std::string& displayName)
+		{
+			const std::string fileStem = SanitizeFileStem(displayName);
+			if (fileStem.empty())
+				return false;
+
+			const std::string oldDirectory = modifiedShader.packageDirectory;
+			if (oldDirectory.empty() || !ShaderInjectorIO::DirectoryExists(oldDirectory))
+				return false;
+
+			const std::string oldJsonPath = modifiedShader.jsonPath;
+			const std::string oldSourcePath = modifiedShader.sourcePath;
+			const std::string oldCompiledBlobPath = modifiedShader.compiledBlobPath;
+
+			const std::string desiredDirectory = ShaderInjectorIO::JoinPath(ShaderInjectorIO::GetModifiedShadersDirectory(), fileStem);
+			const bool directoryAlreadyMatches = PathTextMatches(oldDirectory, desiredDirectory);
+			if (!directoryAlreadyMatches)
+			{
+				if (ShaderInjectorIO::PathExists(desiredDirectory))
+					return false;
+
+				if (!ShaderInjectorIO::MovePath(oldDirectory, desiredDirectory))
+					return false;
+			}
+
+			const std::string currentJsonPath = ShaderInjectorIO::JoinPath(desiredDirectory, ShaderInjectorIO::FileNameFromPath(oldJsonPath));
+			const std::string currentSourcePath = ShaderInjectorIO::JoinPath(desiredDirectory, ShaderInjectorIO::FileNameFromPath(oldSourcePath));
+			const std::string currentCompiledBlobPath = ShaderInjectorIO::JoinPath(desiredDirectory, ShaderInjectorIO::FileNameFromPath(oldCompiledBlobPath));
+
+			const std::string desiredJsonPath = ShaderInjectorIO::JoinPath(desiredDirectory, JsonFileNameForStem(fileStem));
+			const std::string desiredSourcePath = ShaderInjectorIO::JoinPath(desiredDirectory, SourceFileNameForStem(fileStem));
+			const std::string desiredCompiledBlobPath = ShaderInjectorIO::JoinPath(desiredDirectory, CompiledBlobFileNameForStem(fileStem));
+
+			if (!MoveExistingFileIfNeeded(currentSourcePath, desiredSourcePath, true))
+				return false;
+
+			if (!MoveExistingFileIfNeeded(currentCompiledBlobPath, desiredCompiledBlobPath, false))
+				return false;
+
+			modifiedShader.name = displayName;
+			modifiedShader.packageDirectory = desiredDirectory;
+			modifiedShader.sourceFile = ShaderInjectorIO::FileNameFromPath(desiredSourcePath);
+			modifiedShader.sourcePath = desiredSourcePath;
+			modifiedShader.compiledBlobFile = ShaderInjectorIO::FileNameFromPath(desiredCompiledBlobPath);
+			modifiedShader.compiledBlobPath = desiredCompiledBlobPath;
+			modifiedShader.jsonPath = desiredJsonPath;
+
+			if (!PathTextMatches(currentJsonPath, desiredJsonPath) && ShaderInjectorIO::PathExists(desiredJsonPath))
+				return false;
+
+			if (!ModifiedShader::WriteJson(modifiedShader))
+				return false;
+
+			if (!PathTextMatches(currentJsonPath, desiredJsonPath))
+				ShaderInjectorIO::DeleteFileIfExists(currentJsonPath);
+
+			return true;
+		}
+	}
 
 	void RefreshModifiedShaders()
 	{
@@ -127,7 +282,8 @@ namespace DatabaseModifiedShaders
 
 	bool SetModifiedShaderName(const std::string& modifiedShaderId, const std::string& name)
 	{
-		if (name.empty() || name.find_first_not_of(" \t\r\n") == std::string::npos)
+		const std::string displayName = TrimWhitespace(name);
+		if (displayName.empty())
 			return false;
 
 		EnsureModifiedShadersLoaded();
@@ -137,9 +293,7 @@ namespace DatabaseModifiedShaders
 			if (modifiedShader.id != modifiedShaderId)
 				continue;
 
-			modifiedShader.name = name;
-
-			if (!ModifiedShader::WriteJson(modifiedShader))
+			if (!MoveModifiedShaderPackageToName(modifiedShader, displayName))
 				return false;
 
 			RefreshModifiedShaders();

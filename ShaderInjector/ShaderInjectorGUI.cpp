@@ -39,6 +39,99 @@ namespace ShaderInjectorGUI
 	static std::string gModifiedShaderNameBufferId;
 	static char gModifiedShaderNameBuffer[256]{};
 
+	bool ModifiedShaderIsUsedByEnabledShaderTarget(const std::string& modifiedShaderId)
+	{
+		if (modifiedShaderId.empty())
+			return false;
+
+		if (!HookD3D12::gLoadedShaderTargetsOnce)
+			HookD3D12::RefreshLoadedShaderTargets();
+
+		for (const ShaderTarget::ShaderTargetDisk& shaderTarget : HookD3D12::gLoadedShaderTargets)
+		{
+			if (shaderTarget.enabled && shaderTarget.modifiedShaderId == modifiedShaderId)
+				return true;
+		}
+
+		return false;
+	}
+
+	bool EnsureModifiedShaderCompiledForShaderTarget(const std::string& modifiedShaderId)
+	{
+		const ModifiedShader::PackageDisk* modifiedShader = DatabaseModifiedShaders::FindModifiedShaderById(modifiedShaderId);
+		if (!modifiedShader)
+		{
+			WriteToRuntimeLogError("Modified Shader package not found: " + modifiedShaderId);
+			return false;
+		}
+
+		if (!modifiedShader->compiledBlob.empty())
+			return true;
+
+		if (!modifiedShader->compiledBlobPath.empty() && ShaderInjectorIO::FileExists(modifiedShader->compiledBlobPath))
+		{
+			DatabaseModifiedShaders::RefreshModifiedShaders();
+			modifiedShader = DatabaseModifiedShaders::FindModifiedShaderById(modifiedShaderId);
+			if (modifiedShader && !modifiedShader->compiledBlob.empty())
+				return true;
+		}
+
+		if (!DatabaseModifiedShaders::CompileModifiedShader(modifiedShaderId))
+		{
+			WriteToRuntimeLogError("Failed to compile Modified Shader package: " + modifiedShaderId);
+			return false;
+		}
+
+		WriteToRuntimeLogSuccess("Compiled Modified Shader package: " + modifiedShaderId);
+		return true;
+	}
+
+	bool SaveAndReloadShaderTargetAfterModifiedShaderChange(int shaderTargetIndex)
+	{
+		if (shaderTargetIndex < 0 || shaderTargetIndex >= (int)HookD3D12::gLoadedShaderTargets.size())
+			return false;
+
+		ShaderTarget::ShaderTargetDisk& shaderTarget = HookD3D12::gLoadedShaderTargets[shaderTargetIndex];
+
+		if (!EnsureModifiedShaderCompiledForShaderTarget(shaderTarget.modifiedShaderId))
+			return false;
+
+		const ModifiedShader::PackageDisk* modifiedShader = DatabaseModifiedShaders::FindModifiedShaderById(shaderTarget.modifiedShaderId);
+		if (!modifiedShader)
+			return false;
+
+		if (!modifiedShader->enabled || modifiedShader->shaderType != shaderTarget.shaderType)
+		{
+			WriteToRuntimeLogError("Modified Shader package is disabled or has the wrong shader type: " + modifiedShader->id);
+			return false;
+		}
+
+		shaderTarget.shaderProfile = modifiedShader->shaderProfile;
+		shaderTarget.shaderEntryPoint = modifiedShader->shaderEntryPoint;
+		shaderTarget.modifiedShaderBlobPath = modifiedShader->compiledBlobPath;
+
+		if (!ShaderTarget::WriteShaderTargetJson(shaderTarget))
+		{
+			WriteToRuntimeLogError("Failed to save Shader Target after Modified Shader package change: " + shaderTarget.jsonPath);
+			return false;
+		}
+
+		if (!shaderTarget.enabled)
+		{
+			HookD3D12::MarkShaderTargetApplyDirty();
+			WriteToRuntimeLogWarning("Saved Modified Shader package change, but Shader Target is disabled: " + shaderTarget.name);
+			return true;
+		}
+
+		const bool reloaded = HookD3D12::ReloadShaderTarget(shaderTargetIndex);
+		if (reloaded)
+			WriteToRuntimeLogSuccess("Shader Target now uses Modified Shader package: " + DatabaseModifiedShaders::DisplayName(*modifiedShader));
+		else
+			WriteToRuntimeLogError("Failed to reload Shader Target after Modified Shader package change: " + shaderTarget.name);
+
+		return reloaded;
+	}
+
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| MAIN |||||||||||||||||||||||||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| MAIN |||||||||||||||||||||||||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| MAIN |||||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -167,23 +260,27 @@ namespace ShaderInjectorGUI
 				for (size_t index = 0; index < refreshedModifiedShaders.size(); ++index)
 				{
 					const ModifiedShader::PackageDisk& modifiedShader = refreshedModifiedShaders[index];
+					const bool isUsedByShaderTarget = ModifiedShaderIsUsedByEnabledShaderTarget(modifiedShader.id);
+					const bool isActiveUsedPackage = modifiedShader.enabled && isUsedByShaderTarget;
 					std::string label = DatabaseModifiedShaders::DisplayName(modifiedShader);
 					if (!modifiedShader.enabled)
 						label += " (disabled)";
+					if (!isUsedByShaderTarget)
+						label += " (not used)";
 					label += "##ModifiedShader" + std::to_string(index);
 					const bool isSelected = modifiedShader.id == gSelectedModifiedShaderId;
 
-					if (modifiedShader.enabled)
+					if (isActiveUsedPackage)
 					{
 						ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.12f, 0.38f, 0.16f, 1.0f));
 						ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.16f, 0.50f, 0.22f, 1.0f));
 						ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.20f, 0.62f, 0.28f, 1.0f));
 					}
 
-					if (ImGui::Selectable(label.c_str(), isSelected || modifiedShader.enabled))
+					if (ImGui::Selectable(label.c_str(), isSelected || isActiveUsedPackage))
 						gSelectedModifiedShaderId = modifiedShader.id;
 
-					if (modifiedShader.enabled)
+					if (isActiveUsedPackage)
 						ImGui::PopStyleColor(3);
 
 					if (isSelected)
@@ -529,9 +626,15 @@ namespace ShaderInjectorGUI
 
 				if (ImGui::Selectable(displayName.c_str(), selected))
 				{
-					replacement.modifiedShaderId = modifiedShader.id;
-					replacement.shaderProfile = modifiedShader.shaderProfile;
-					replacement.shaderEntryPoint = modifiedShader.shaderEntryPoint;
+					if (!selected)
+					{
+						replacement.modifiedShaderId = modifiedShader.id;
+						replacement.shaderProfile = modifiedShader.shaderProfile;
+						replacement.shaderEntryPoint = modifiedShader.shaderEntryPoint;
+						replacement.modifiedShaderBlobPath = modifiedShader.compiledBlobPath;
+
+						SaveAndReloadShaderTargetAfterModifiedShaderChange(replacementIndex);
+					}
 				}
 
 				if (selected)

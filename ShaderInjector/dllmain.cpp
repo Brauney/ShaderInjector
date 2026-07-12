@@ -12,6 +12,7 @@
 #include "dsound_proxy.h"
 #include "ShaderInjectorIO.h"
 #include "DatabaseModifiedShaders.h"
+#include "SystemInfoLogger.h"
 
 //||||||||||||||||||||||||||||||| ON ATTACH |||||||||||||||||||||||||||||||
 //||||||||||||||||||||||||||||||| ON ATTACH |||||||||||||||||||||||||||||||
@@ -37,6 +38,9 @@ static DWORD WINAPI OnAttachDLL(LPVOID)
 
 	//initalize IO operations (folders, files, internal shader files)
 	ShaderInjectorIO::Initialize();
+
+	//record machine, executable, and display diagnostics for user bug reports
+	SystemInfoLogger::LogProcessAndSystemInfo();
 
 	//collect modified shaders stored in "ShaderInjector/ModifiedShaders"
 	DatabaseModifiedShaders::RefreshModifiedShaders();
