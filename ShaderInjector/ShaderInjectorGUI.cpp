@@ -56,6 +56,80 @@ namespace ShaderInjectorGUI
 		return false;
 	}
 
+	struct ModifiedShaderRecompileResult
+	{
+		bool compiled = false;
+		int linkedShaderTargetCount = 0;
+		int reloadedShaderTargetCount = 0;
+		int skippedInactiveShaderTargetCount = 0;
+	};
+
+	ModifiedShaderRecompileResult RecompileModifiedShaderAndReloadLinkedTargets(const std::string& modifiedShaderId)
+	{
+		ModifiedShaderRecompileResult result{};
+		result.compiled = DatabaseModifiedShaders::CompileModifiedShader(modifiedShaderId);
+		if (!result.compiled)
+			return result;
+
+		const ModifiedShader::PackageDisk* modifiedShader = DatabaseModifiedShaders::FindModifiedShaderById(modifiedShaderId);
+		if (!modifiedShader)
+			return result;
+
+		if (!HookD3D12::gLoadedShaderTargetsOnce)
+			HookD3D12::RefreshLoadedShaderTargets();
+
+		for (int shaderTargetIndex = 0; shaderTargetIndex < static_cast<int>(HookD3D12::gLoadedShaderTargets.size()); ++shaderTargetIndex)
+		{
+			const ShaderTarget::ShaderTargetDisk& shaderTarget = HookD3D12::gLoadedShaderTargets[shaderTargetIndex];
+			if (shaderTarget.modifiedShaderId != modifiedShaderId)
+				continue;
+
+			++result.linkedShaderTargetCount;
+			if (!shaderTarget.enabled || !modifiedShader->enabled || shaderTarget.shaderType != modifiedShader->shaderType)
+			{
+				++result.skippedInactiveShaderTargetCount;
+				continue;
+			}
+
+			if (HookD3D12::ReloadShaderTarget(shaderTargetIndex))
+				++result.reloadedShaderTargetCount;
+		}
+
+		return result;
+	}
+
+	struct ShaderTargetReloadResult
+	{
+		int activeShaderTargetCount = 0;
+		int reloadedShaderTargetCount = 0;
+		int skippedInactiveShaderTargetCount = 0;
+	};
+
+	ShaderTargetReloadResult ReloadAllActiveShaderTargets()
+	{
+		ShaderTargetReloadResult result{};
+		DatabaseModifiedShaders::RefreshModifiedShaders();
+
+		if (!HookD3D12::gLoadedShaderTargetsOnce)
+			HookD3D12::RefreshLoadedShaderTargets();
+
+		for (int shaderTargetIndex = 0; shaderTargetIndex < static_cast<int>(HookD3D12::gLoadedShaderTargets.size()); ++shaderTargetIndex)
+		{
+			const ShaderTarget::ShaderTargetDisk& shaderTarget = HookD3D12::gLoadedShaderTargets[shaderTargetIndex];
+			if (!HookD3D12::IsShaderTargetEffectivelyEnabled(shaderTarget))
+			{
+				++result.skippedInactiveShaderTargetCount;
+				continue;
+			}
+
+			++result.activeShaderTargetCount;
+			if (HookD3D12::ReloadShaderTarget(shaderTargetIndex))
+				++result.reloadedShaderTargetCount;
+		}
+
+		return result;
+	}
+
 	bool EnsureModifiedShaderCompiledForShaderTarget(const std::string& modifiedShaderId)
 	{
 		const ModifiedShader::PackageDisk* modifiedShader = DatabaseModifiedShaders::FindModifiedShaderById(modifiedShaderId);
@@ -240,6 +314,50 @@ namespace ShaderInjectorGUI
 				if (!ShaderInjectorIO::OpenDirectory(ShaderInjectorIO::GetModifiedShadersDirectory()))
 					WriteToRuntimeLogError("Could not open the Modified Shaders folder.");
 			}
+			ImGui::SameLine();
+			ImGui::BeginDisabled(modifiedShaders.empty());
+			if (ImGui::Button("Recompile All##ModifiedShaders"))
+			{
+				std::vector<std::string> modifiedShaderIds;
+				modifiedShaderIds.reserve(modifiedShaders.size());
+				for (const ModifiedShader::PackageDisk& modifiedShader : modifiedShaders)
+					modifiedShaderIds.push_back(modifiedShader.id);
+
+				int compiledCount = 0;
+				int failedCompileCount = 0;
+				int linkedShaderTargetCount = 0;
+				int reloadedShaderTargetCount = 0;
+				int skippedInactiveShaderTargetCount = 0;
+
+				for (const std::string& modifiedShaderId : modifiedShaderIds)
+				{
+					const ModifiedShaderRecompileResult result = RecompileModifiedShaderAndReloadLinkedTargets(modifiedShaderId);
+					if (!result.compiled)
+					{
+						++failedCompileCount;
+						WriteToRuntimeLogError("Failed to compile Modified Shader: " + modifiedShaderId);
+						continue;
+					}
+
+					++compiledCount;
+					linkedShaderTargetCount += result.linkedShaderTargetCount;
+					reloadedShaderTargetCount += result.reloadedShaderTargetCount;
+					skippedInactiveShaderTargetCount += result.skippedInactiveShaderTargetCount;
+				}
+
+				const std::string summary =
+					"Recompile All Modified Shaders: compiled=" + std::to_string(compiledCount) +
+					" failed=" + std::to_string(failedCompileCount) +
+					" reloadedTargets=" + std::to_string(reloadedShaderTargetCount) +
+					"/" + std::to_string(linkedShaderTargetCount) +
+					" skippedInactiveTargets=" + std::to_string(skippedInactiveShaderTargetCount);
+
+				if (failedCompileCount == 0 && reloadedShaderTargetCount + skippedInactiveShaderTargetCount == linkedShaderTargetCount)
+					WriteToRuntimeLogSuccess(summary);
+				else
+					WriteToRuntimeLogError(summary);
+			}
+			ImGui::EndDisabled();
 
 			const std::vector<ModifiedShader::PackageDisk>& refreshedModifiedShaders = DatabaseModifiedShaders::GetModifiedShaders();
 			if (refreshedModifiedShaders.empty())
@@ -351,30 +469,22 @@ namespace ShaderInjectorGUI
 			ImGui::SameLine();
 			if (ImGui::Button("Recompile##ModifiedShaders"))
 			{
-				int linkedReplacementCount = 0;
-				int successfulReplacementCount = 0;
-				if (!DatabaseModifiedShaders::CompileModifiedShader(gSelectedModifiedShaderId))
+				const ModifiedShaderRecompileResult result = RecompileModifiedShaderAndReloadLinkedTargets(gSelectedModifiedShaderId);
+				if (!result.compiled)
 				{
 					WriteToRuntimeLogError("Failed to compile Modified Shader: " + gSelectedModifiedShaderId);
 				}
 				else
 				{
-					for (int replacementIndex = 0; replacementIndex < static_cast<int>(HookD3D12::gLoadedShaderTargets.size()); ++replacementIndex)
-					{
-						if (HookD3D12::gLoadedShaderTargets[replacementIndex].modifiedShaderId != gSelectedModifiedShaderId)
-							continue;
-
-						++linkedReplacementCount;
-						if (HookD3D12::ReloadShaderTarget(replacementIndex))
-							++successfulReplacementCount;
-					}
-
-					if (linkedReplacementCount == 0)
+					const int activeLinkedShaderTargetCount = result.linkedShaderTargetCount - result.skippedInactiveShaderTargetCount;
+					if (result.linkedShaderTargetCount == 0)
 						WriteToRuntimeLogSuccess("Compiled Modified Shader: " + gSelectedModifiedShaderId);
-					else if (successfulReplacementCount == linkedReplacementCount)
+					else if (activeLinkedShaderTargetCount == 0)
+						WriteToRuntimeLogSuccess("Compiled Modified Shader; linked shader targets are inactive: " + gSelectedModifiedShaderId);
+					else if (result.reloadedShaderTargetCount == activeLinkedShaderTargetCount)
 						WriteToRuntimeLogSuccess("Compiled Modified Shader and reloaded all linked replacements: " + gSelectedModifiedShaderId);
 					else
-						WriteToRuntimeLogError("Reloaded " + std::to_string(successfulReplacementCount) + " of " + std::to_string(linkedReplacementCount) + " linked replacements.");
+						WriteToRuntimeLogError("Reloaded " + std::to_string(result.reloadedShaderTargetCount) + " of " + std::to_string(activeLinkedShaderTargetCount) + " active linked replacements.");
 				}
 			}
 			ImGui::SameLine();
@@ -476,6 +586,23 @@ namespace ShaderInjectorGUI
 
 			if (ImGui::Button("Open Folder##ShaderTargets") && !ShaderInjectorIO::OpenDirectory(ShaderInjectorIO::GetShaderTargetsDirectory()))
 				WriteToRuntimeLogError("Could not open Modified Shader package folder: " + ShaderInjectorIO::GetShaderTargetsDirectory());
+
+			ImGui::SameLine();
+			ImGui::BeginDisabled(HookD3D12::gLoadedShaderTargets.empty());
+			if (ImGui::Button("Reload All##ShaderTargets"))
+			{
+				const ShaderTargetReloadResult result = ReloadAllActiveShaderTargets();
+				const std::string summary =
+					"Reload All Shader Targets: reloaded=" + std::to_string(result.reloadedShaderTargetCount) +
+					"/" + std::to_string(result.activeShaderTargetCount) +
+					" skippedInactiveTargets=" + std::to_string(result.skippedInactiveShaderTargetCount);
+
+				if (result.reloadedShaderTargetCount == result.activeShaderTargetCount)
+					WriteToRuntimeLogSuccess(summary);
+				else
+					WriteToRuntimeLogError(summary);
+			}
+			ImGui::EndDisabled();
 
 			if (HookD3D12::gLoadedShaderTargets.empty())
 			{

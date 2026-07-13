@@ -334,7 +334,7 @@ namespace DatabaseModifiedShaders
 			}
 		}
 
-		if (!modifiedShader || !modifiedShader->enabled || modifiedShader->sourcePath.empty() || modifiedShader->compiledBlobPath.empty())
+		if (!modifiedShader || modifiedShader->sourcePath.empty() || modifiedShader->compiledBlobPath.empty())
 		{
 			return false;
 		}
