@@ -1,7 +1,7 @@
 # Shader Injector
 Shader Injector Mod for [FF7 Rebirth PC](https://store.steampowered.com/app/2909400/FINAL_FANTASY_VII_REBIRTH/). This is a DX12 *(D3D12)* based mod that intercepts the rendering API calls, and allows you to inject/replace the original shaders within the title with modified ones during runtime. This mod was built for [FF7 Rebirth](https://store.steampowered.com/app/2909400/FINAL_FANTASY_VII_REBIRTH/), however because it's primarly just a DX12 interceptor, theroetically this can be adapted to work with other D3D12 based titles.
 
-[More technical details here.](https://frostbone25.github.io/p/ff7-rebirth-contact-shadows/#timings-on-1920x1080-and-3840x2160)
+[Contact Shadows details here.](https://frostbone25.github.io/p/ff7-rebirth-contact-shadows/#timings-on-1920x1080-and-3840x2160)
 
 ---
 # Download
@@ -13,10 +13,14 @@ Shader Injector Mod for [FF7 Rebirth PC](https://store.steampowered.com/app/2909
 ### [Installation Guide](https://github.com/frostbone25/ShaderInjector/blob/main/INSTALL.md)
 ### [Update Guide](https://github.com/frostbone25/ShaderInjector/blob/main/UPDATE.md)
 ### [ShaderInjector.ini](https://github.com/frostbone25/ShaderInjector/blob/main/InjectorSettings.md)
-### [Live Shader Editing](https://github.com/frostbone25/ShaderInjector/blob/main/LiveShaderEditing.md)
 ### [How to report an issue](https://github.com/frostbone25/ShaderInjector/blob/main/IssueReport.md)
 ### [Solutions / Fixes](https://github.com/frostbone25/ShaderInjector/blob/main/Solutions.md)
+### [Live Shader Editing](https://github.com/frostbone25/ShaderInjector/blob/main/LiveShaderEditing.md)
 ### *Building a Shader (coming soon...)*
+---
+#### *[Update Guide (Legacy Version)](https://github.com/frostbone25/ShaderInjector/blob/main/UPDATE-LegacyPreV2.md)*
+#### *[Installation Guide (Legacy Version)](https://github.com/frostbone25/ShaderInjector/blob/main/INSTALL-LegacyPreV2.md)*
+#### *[Live Shader Editing (Legacy Version)](https://github.com/frostbone25/ShaderInjector/blob/main/LiveShaderEditing-LegacyPreV2.md)*
 ---
 # Showcase
 
@@ -47,11 +51,10 @@ In addition if you would like to do pull requests to improve or contribute featu
 
 ---
 # TODO
+- Vertex / Mesh Shader Replacements
+- Improvements to automatic shader discovery.
+- Stability Improvements for Linux
 - General Bug / Issue Fixing
-- Compute / Vertex Shader Replacements
-- Automated Shader Replacement Searching *(eliminating the setup steps of manual search for shaders)*
-- Improve "stability" in regards to GPU/Driver updates by parsing shader bytecode directly in memory and obtaining unique shader and other PSO characteristics to identify a specific shader reliably across machines for automated shader finding/replacement.
-- Linux Support
 
 ---
 # Sources / References
@@ -60,6 +63,7 @@ In addition if you would like to do pull requests to improve or contribute featu
 - [json (nlohmann)](https://github.com/nlohmann/json)
 - [inifile-cpp (Rookfighter)](https://github.com/Rookfighter/inifile-cpp)
 - [Universal-Dear-ImGui-Hook (Sh0ckFR)](https://github.com/Sh0ckFR/Universal-Dear-ImGui-Hook/tree/master)
+- [RenderDoc](https://renderdoc.org/)
 
 # Special Thanks
 
@@ -72,3 +76,5 @@ People who have aided in the development of this project with testing or other v
 - sajittarius
 - [Zaccachino](https://www.nexusmods.com/profile/Zaccachino)
 - [Ninjagrime](https://www.nexusmods.com/profile/Ninjagrime)
+- [Phroster](https://www.nexusmods.com/profile/Phroster)
+- [willywill](https://github.com/willywill)
