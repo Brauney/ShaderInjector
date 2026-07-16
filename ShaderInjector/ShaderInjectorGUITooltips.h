@@ -7,19 +7,22 @@ namespace ShaderInjectorGUI
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| UI - MODIFIED SHADERS |||||||||||||||||||||||||||||||||||||||||||||||||||||
 
 	static const char* noteModifiedShadersText =
-"Modified shaders are packages with modified HLSL source code shaders. "
+"Modified shaders are the main HLSL source code shaders. "
+"The majority of the real meat are stored within 'ShaderInjector/ModifiedShaders/Includes'. "
 "These packages also contain important data used during automatic shader discovery. "
-"Based on the loaded modified shaders the injector will use the data when catching PSOs to find shaders that match the signature of what the modified shader is trying to 'modify'. "
+"Based on loaded modified shaders the injector will use the data when catching PSOs to find shaders that match the signature of the modified shader. "
 "Once a match is found, a shader target is created automatically that uses the modified shader bytecode. "
-"NOTE: For shader targets to get found and created automatically, your game shader cache must be cleared/deleted). ";
+"NOTE: For shader targets to get found and created automatically, your game shader cache must be cleared/deleted. ";
 
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| UI - SHADER TARGETS |||||||||||||||||||||||||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| UI - SHADER TARGETS |||||||||||||||||||||||||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| UI - SHADER TARGETS |||||||||||||||||||||||||||||||||||||||||||||||||||||
 
 	static const char* noteShaderTargetsText =
-"Shader targets essentially are the endpoints to the PSOs that actually get modified in your game. "
-"These packages get created automatically during shader discovery. ";
+"Shader targets are automatically generated endpoints to the actual PSOs within the game. "
+"These packages should get created automatically during shader discovery. "
+"If you don't have any shader targets, then that means that none of the modified shaders above will apply. "
+"NOTE: For shader targets to get created automatically, your game shader cache must be cleared/deleted. ";
 
 	static const char* tooltipRefreshShaderTargets =
 		"Refreshes the view in the 'ShaderInjector/ShaderTargets' folder for shader targets that you created. ";

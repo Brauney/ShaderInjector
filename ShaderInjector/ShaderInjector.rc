@@ -1,6 +1,7 @@
 // Microsoft Visual C++ generated resource script.
 //
 #include "resource.h"
+#include "ShaderInjectorVersion.h"
 /////////////////////////////////////////////////////////////////////////////
 // English (United States) resources
 
@@ -14,8 +15,8 @@ LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 2,0,0,0
- PRODUCTVERSION 2,0,0,0
+ FILEVERSION SHADER_INJECTOR_VERSION_NUMERIC
+ PRODUCTVERSION SHADER_INJECTOR_VERSION_NUMERIC
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -33,12 +34,12 @@ BEGIN
             VALUE "Comments", "Open-source D3D12 shader injector for FINAL FANTASY VII REBIRTH"
             VALUE "CompanyName", "David Matos"
             VALUE "FileDescription", "Shader Injector - D3D12 Shader Replacement"
-            VALUE "FileVersion", "2.0.0.0"
+            VALUE "FileVersion", SHADER_INJECTOR_VERSION_STRING
             VALUE "InternalName", "ShaderInjector"
             VALUE "LegalCopyright", "Copyright (c) 2026 David Matos"
             VALUE "OriginalFilename", "dsound.dll"
             VALUE "ProductName", "Shader Injector"
-            VALUE "ProductVersion", "2.0.0.0"
+            VALUE "ProductVersion", SHADER_INJECTOR_VERSION_STRING
         END
     END
     BLOCK "VarFileInfo"
