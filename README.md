@@ -15,7 +15,7 @@ Shader Injector Mod for [FF7 Rebirth PC](https://store.steampowered.com/app/2909
 ### [ShaderInjector.ini](https://github.com/frostbone25/ShaderInjector/blob/main/InjectorSettings.md)
 ### [How to report an issue](https://github.com/frostbone25/ShaderInjector/blob/main/IssueReport.md)
 ### [Solutions / Fixes](https://github.com/frostbone25/ShaderInjector/blob/main/Solutions.md)
-### [Live Shader Editing](https://github.com/frostbone25/ShaderInjector/blob/main/LiveShaderEditing.md)
+### [Live Shader Editing](https://github.com/frostbone25/ShaderInjector/blob/main/LiveShaderEditing.md) / [Configuration Guide](https://github.com/frostbone25/ShaderInjector/blob/main/ConfigurationGuide.md)
 ### *Building a Shader (coming soon...)*
 ---
 #### *[Update Guide (Legacy Version)](https://github.com/frostbone25/ShaderInjector/blob/main/UPDATE-LegacyPreV2.md)*
