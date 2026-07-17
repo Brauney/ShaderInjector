@@ -149,10 +149,10 @@
       <ModuleDefinitionFile>$(ProjectDir)exports.def</ModuleDefinitionFile>
       <AdditionalDependencies>d3d12.lib;dxgi.lib;$(ProjectDir)ExternalDependencies\MinHook_134\lib\libMinHook.x64.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
-    <PostBuildEvent>
-      <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)Build\FinalizeRelease.ps1" -TargetPath "$(TargetPath)"</Command>
-      <Message>Finalizing Shader Injector release artifact</Message>
-    </PostBuildEvent>
+	<PostBuildEvent>
+	  <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)Build\FinalizeRelease.ps1" -TargetPath "$(TargetPath)"</Command>
+	  <Message>Finalizing Shader Injector release artifact</Message>
+	</PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="FPSCounter.h" />
@@ -181,17 +181,7 @@
     <ClInclude Include="dsound_proxy.h" />
     <ClInclude Include="Keycodes.h" />
     <ClInclude Include="ProcessRunner.h" />
-    <ClInclude Include="RenderDocIntegration.h" />
-    <ClInclude Include="ExternalDependencies\renderdoc\include\renderdoc_app.h" />
-    <ClInclude Include="resource.h" />
-    <ClInclude Include="ShaderAnalysis.h" />
-    <ClInclude Include="ShaderAnalyzer.h" />
-    <ClInclude Include="ShaderDiscovery.h" />
-    <ClInclude Include="ShaderAutomaticDiscovery.h" />
-    <ClInclude Include="ModifiedShader.h" />
-    <ClInclude Include="ModifiedShaderCreation.h" />
-    <ClInclude Include="SimilarityScore.h" />
-    <ClInclude Include="ShaderInjectorVersion.h" />
+	<ClInclude Include="ShaderInjectorVersion.h" />
     <ClInclude Include="ShaderInjectorGUITooltips.h" />
     <ClInclude Include="ShaderInjectorIO.h" />
     <ClInclude Include="ShaderInjectorSettings.h" />
@@ -255,6 +245,13 @@
   <ItemGroup>
     <None Include="Build\FinalizeRelease.ps1" />
     <None Include="Build\RELEASE_SECURITY.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="ShaderInjector.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Build\FinalizeRelease.ps1" />
+    <None Include="Build\Signing.md" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

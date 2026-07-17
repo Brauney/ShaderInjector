@@ -93,6 +93,9 @@
     <ClInclude Include="ShaderInjectorIO.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+	<ClInclude Include="ShaderInjectorVersion.h">
+	  <Filter>Header Files</Filter>
+	</ClInclude>
 	<ClInclude Include="ProcessRunner.h">
 	  <Filter>Header Files</Filter>
 	</ClInclude>

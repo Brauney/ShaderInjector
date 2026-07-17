@@ -5,8 +5,19 @@
 //|||||||||||||||||||||||||||||||||| CONFIGURATION - BRDF ||||||||||||||||||||||||||||||||||
 //here are parameters that are wired up for easy tweakin...
 
+//this is the original shading model used for the game
+//its simple, and efficent, but not accurate
+//if you want to retain the original game shading turn this on
 //#define SHADING_DEFAULT_LIT_LAMBERT //<--- original game
+
+//new shading model, little different but more accurate to diffuse shading in real life
+//visually it makes diffuse materials more "diffuse" and matte as it should caused by retro-reflection (when you look away from the light direction)
+//but for some artistically this might be undesirable
 //#define SHADING_DEFAULT_LIT_BURLEY
+
+//new shading model, little different but more accurate to diffuse shading in real life
+//similar to burley, visually it makes diffuse materials more "diffuse" and matte as it should caused by retro-reflection (when you look away from the light direction)
+//but for some artistically this might be undesirable
 #define SHADING_DEFAULT_LIT_OREN_NAYAR
 
 //|||||||||||||||||||||||||||||||||| CONFIGURATION - MICRO SHADOWS ||||||||||||||||||||||||||||||||||
@@ -94,18 +105,33 @@
 
 //this controls how "thick" objects are in the depth buffer
 //RANGE: this should be between [10 <---> 100.0]
-//DEFAULT: 0.35
+//DEFAULT: 25.0
 //HIGHER VALUES: larger volume of shadow, but can lead to alot of wierd false shadowing. objects up close can cast shadows onto objects far behind it which can look odd.
 //LOWER VALUES: smaller volume of shadow, less false shadowing, but they can appear less dense and might be too thin
 #define CONTACT_SHADOWS_THICKNESS 25.0
 
 //this is a small bias factor to minimize contact shadow acne on sloped surfaces
-//RANGE: this should be between [0.0 <---> 0.1]
-#define CONTACT_SHADOWS_BIAS 0.005
+//high values = reduced acne but can introduce visual issues where shadows appear less grounded
+//low values = potentially increased acne but keeps shadows grounded
+//RANGE: this should be between [0.0 <---> 5.0]
+//DEFAULT: 1.0
+#define CONTACT_SHADOWS_BIAS 1.0
+
+//this is a small bias factor to minimize contact shadow acne on sloped surfaces for hair specifically
+//RANGE: this should be between [0.0 <---> 5.0]
+//high values = reduced acne but can introduce visual issues where shadows appear less grounded
+//low values = potentially increased acne but keeps shadows grounded
+//RANGE: this should be between [0.0 <---> 5.0]
+//DEFAULT: 1.5
+#define CONTACT_SHADOWS_BIAS_HAIR 1.5
 
 //this is a small bias factor to minimize contact shadow acne on sloped surfaces using surface normal
-//RANGE: this should be between [0.0 <---> 1.0]
-#define CONTACT_SHADOWS_NORMAL_BIAS 0.005
+//RANGE: this should be between [0.0 <---> 5.0]
+//high values = reduced acne but can introduce visual issues where shadows appear less grounded
+//low values = potentially increased acne but keeps shadows grounded
+//RANGE: this should be between [0.0 <---> 5.0]
+//DEFAULT: 0.5
+#define CONTACT_SHADOWS_NORMAL_BIAS 0.5
 
 //OPTIMIZATION: this avoids calculating contact shadows for sky pixels
 //has no effect visually, but can save you quite a bit of frametime especially the more you look up :P 
@@ -115,7 +141,7 @@
 //OPTIMIZATION: this calculates contact shadows for every other pixel in a checkerboard like pattern that switches every frame
 //it saves a small bit of frametime, but does have a quality degredation with more visible shimmering at distances
 //disable if you want sharper true per-pixel contact shadows (at a bit of a perf hit)
-#define CONTACT_SHADOW_CHECKERBOARD
+//#define CONTACT_SHADOW_CHECKERBOARD
 
 //[CONTACT_SHADOW_CHECKERBOARD ONLY!] This only works if checkerboarding is enabled!
 //this tries to fill in the gaps intelligently during checkerboard rendering minimize holes where no shadow is calculated 
@@ -148,6 +174,19 @@
 //#define DISABLE_CONTACT_SHADOWS_FOR_SUBSURFACE_PROFILE
 //#define DISABLE_CONTACT_SHADOWS_FOR_HAIR
 //#define DISABLE_CONTACT_SHADOWS_FOR_EYE
+
+//another requested feature...
+//this is an added effect that will gradually "fade" contact shadows as it goes further out
+//this does have a bit of a perf hit with (extra instructions per iteration in the loop now)
+//I've done my best to optimize and keep it light, but it just requires more instructions to achieve
+//still, in the grand scheme of things this should be pretty light and enabled if you really want to mitigate some of shortcomings (atleast its not another texture sample)
+#define CONTACT_SHADOWS_FALLOFF
+
+//this shapes the falloff
+//higher values = sharper/darker shadow further out
+//lower values = softer/lighter shadow further out
+//DEFAULT: 3
+#define CONTACT_SHADOWS_FALLOFF_CONTRAST 3.0
 
 //|||||||||||||||||||||||||||||||||| MACROS ||||||||||||||||||||||||||||||||||
 //|||||||||||||||||||||||||||||||||| MACROS ||||||||||||||||||||||||||||||||||
@@ -628,10 +667,11 @@ float InterleavedGradientNoise(float2 pixCoord, int frameCount)
 	return frac(magic.z * frac(dot(pixCoord, magic.xy)));
 }
 
+//128x128x64 R8G8B8A8
 float LoadSpatiotemporalBlueNoise(PSInput input)
 {
     #if defined(RANDOM_ANIMATE_NOISE)
-        int frameSlice = View_StateFrameIndex & 7;
+        int frameSlice = View_StateFrameIndex & 63;
     #else
         int frameSlice = 0;
     #endif
@@ -1060,13 +1100,27 @@ float CalculateContactShadows(FGBufferData gbufferData, FResolvedPixel resolvedP
 		float random = 1.0f;
 	#endif
 	
+    //approximation of how big a pixel is
+    //this is because at low resolutions biasing / noise issues get really bad
+    //but intrestingly at higher and higher resolutions the biasing/noise issues go away
+    //so this means that for the most part we should factor in the pixel scale of the render target
+    //for inv size, natrually lower resolutions will have a larger number (higher res lower)
+    //so we can use this to scale our set bias factor
+    float pixelSize = max(View_BufferSizeAndInvSize.z, View_BufferSizeAndInvSize.w);
+    pixelSize *= 100.0f; //this 100 is arbitrary
+
+    float contactShadowBias = pixelSize * CONTACT_SHADOWS_BIAS;
+
+    if(gbufferData.ShadingModelID == SHADINGMODELID_HAIR)
+		contactShadowBias = pixelSize * CONTACT_SHADOWS_BIAS_HAIR;
+
 	//FIX: apparently we use "pre" translation? seems like there is an extra necessary offset to get an accurate world position vector
     float3 worldPosition = resolvedPixel.WorldPosition + View_PreViewTranslation;
 
 	//apply normal bias to help mitigate self-shadowing issues
-	worldPosition += gbufferData.WorldNormal * CONTACT_SHADOWS_NORMAL_BIAS;
+    worldPosition += gbufferData.WorldNormal * (pixelSize * CONTACT_SHADOWS_NORMAL_BIAS);
 
-    float3 rayOrigin = worldPosition;
+    float3 rayOrigin = worldPosition + resolvedPixel.LightVector * contactShadowBias;
     float3 rayEnd    = rayOrigin + resolvedPixel.LightVector * CONTACT_SHADOWS_RAY_LENGTH;
 
 	//FIX: apparently we use translated world to clip, which supposedly is more accurate?
@@ -1085,10 +1139,13 @@ float CalculateContactShadows(FGBufferData gbufferData, FResolvedPixel resolvedP
 	// xy = scale (0.5, -0.5 on D3D), zw = bias (0.5, 0.5 + viewport offset + TAA jitter)
 	// if we don't we can (and have) end up in a case where due to some resolution mismatching
 	// contact shadows can have a lot of artifacts and seemingly appear "offset" or behind for some user graphics configs
-	float2 uvStart = mad(ndcStart.xy, View_ScreenPositionScaleBias.xy, View_ScreenPositionScaleBias.zw);
-	float2 uvEnd   = mad(ndcEnd.xy,   View_ScreenPositionScaleBias.xy, View_ScreenPositionScaleBias.zw);
+    //IMPORTANT NOTE 2: WATCH THAT SWIZZLE! it needs to be wz not zw... otherwise we get scaling issues at non standard resolutions
+	float2 uvStart = mad(ndcStart.xy, View_ScreenPositionScaleBias.xy, View_ScreenPositionScaleBias.wz);
+	float2 uvEnd   = mad(ndcEnd.xy,   View_ScreenPositionScaleBias.xy, View_ScreenPositionScaleBias.wz);
 	float2 uvStep  = (uvEnd - uvStart) * invSamples;
 	float2 uv      = mad(uvStep, random, uvStart);
+
+	float occlusion = 1.0f;
 
     [unroll]
     for (int i = 0; i < CONTACT_SHADOWS_SAMPLES; ++i)
@@ -1101,16 +1158,36 @@ float CalculateContactShadows(FGBufferData gbufferData, FResolvedPixel resolvedP
         float sceneDepth = LinearizeSceneDepth(deviceDepth);
         float penetration = rayDepth - sceneDepth;
 
-		//NOTE TO SELF: while this is simple and fast, leaves a harsh cutoff
-		//for thickness we can calculate a "weight" to do a smoother falloff out from shadow
-        if (penetration > CONTACT_SHADOWS_BIAS && penetration < CONTACT_SHADOWS_THICKNESS)
-            return 0.0;
+		#if defined(CONTACT_SHADOWS_FALLOFF)
+			if (penetration > contactShadowBias && penetration < CONTACT_SHADOWS_THICKNESS)
+			{
+				//how far along the ray are we? (we are going from point towards the light)
+				float rayProgress = i * invSamples;
+				float thicknessFade = 1.0 - saturate((penetration - contactShadowBias) / (CONTACT_SHADOWS_THICKNESS - contactShadowBias));
+				float distanceFade = 1.0 - saturate(rayProgress);
+				float sampleShadow = 1.0 - distanceFade;
+				sampleShadow *= sampleShadow;
+
+				occlusion = min(occlusion, sampleShadow);
+			}
+		#else
+			//NOTE TO SELF: while this is simple and fast, leaves a harsh cutoff
+			//for thickness we can calculate a "weight" to do a smoother falloff out from shadow
+			if (penetration > contactShadowBias && penetration < CONTACT_SHADOWS_THICKNESS)
+				return 0.0;
+		#endif
 
         rayDepth += rayDepthStep;
         uv += uvStep;
     }
 
-    return 1.0f;
+	//when introducing the falloff shadows can appear a little too light
+	//to compensate especially near contacts we have a contrast factor here
+	#if defined(CONTACT_SHADOWS_FALLOFF)
+		occlusion = pow(occlusion, CONTACT_SHADOWS_FALLOFF_CONTRAST);
+	#endif
+
+    return occlusion;
 }
 
 //||||||||||||||||||||||||||||||| SHADING - DEFAULT LIT |||||||||||||||||||||||||||||||

@@ -106,12 +106,27 @@
 #define CONTACT_SHADOWS_THICKNESS 0.325
 
 //this is a small bias factor to minimize contact shadow acne on sloped surfaces
-//RANGE: this should be between [0.0 <---> 0.1]
-#define CONTACT_SHADOWS_BIAS 0.0001
+//high values = reduced acne but can introduce visual issues where shadows appear less grounded
+//low values = potentially increased acne but keeps shadows grounded
+//RANGE: this should be between [0.0 <---> 5.0]
+//DEFAULT: 0.1
+#define CONTACT_SHADOWS_BIAS 0.1
+
+//this is a small bias factor to minimize contact shadow acne on sloped surfaces for hair specifically
+//RANGE: this should be between [0.0 <---> 5.0]
+//high values = reduced acne but can introduce visual issues where shadows appear less grounded
+//low values = potentially increased acne but keeps shadows grounded
+//RANGE: this should be between [0.0 <---> 5.0]
+//DEFAULT: 0.1
+#define CONTACT_SHADOWS_BIAS_HAIR 0.1
 
 //this is a small bias factor to minimize contact shadow acne on sloped surfaces using surface normal
-//RANGE: this should be between [0.0 <---> 1.0]
-#define CONTACT_SHADOWS_NORMAL_BIAS 0.001
+//RANGE: this should be between [0.0 <---> 5.0]
+//high values = reduced acne but can introduce visual issues where shadows appear less grounded
+//low values = potentially increased acne but keeps shadows grounded
+//RANGE: this should be between [0.0 <---> 5.0]
+//DEFAULT: 0.1
+#define CONTACT_SHADOWS_NORMAL_BIAS 0.1
 
 //OPTIMIZATION: this avoids calculating contact shadows for sky pixels
 //has no effect visually, but can save you quite a bit of frametime especially the more you look up :P 
@@ -154,6 +169,19 @@
 //#define DISABLE_CONTACT_SHADOWS_FOR_SUBSURFACE_PROFILE
 //#define DISABLE_CONTACT_SHADOWS_FOR_HAIR
 //#define DISABLE_CONTACT_SHADOWS_FOR_EYE
+
+//another requested feature...
+//this is an added effect that will gradually "fade" contact shadows as it goes further out
+//this does have a bit of a perf hit with (extra instructions per iteration in the loop now)
+//I've done my best to optimize and keep it light, but it just requires more instructions to achieve
+//still, in the grand scheme of things this should be pretty light and enabled if you really want to mitigate some of shortcomings (atleast its not another texture sample)
+#define CONTACT_SHADOWS_FALLOFF
+
+//this shapes the falloff
+//higher values = sharper/darker shadow further out
+//lower values = softer/lighter shadow further out
+//DEFAULT: 4
+#define CONTACT_SHADOWS_FALLOFF_CONTRAST 3.0
 
 //|||||||||||||||||||||||||||||||||| MACROS ||||||||||||||||||||||||||||||||||
 //|||||||||||||||||||||||||||||||||| MACROS ||||||||||||||||||||||||||||||||||
@@ -1107,20 +1135,33 @@ float FastContactShadowClipSpace(
     float3 worldNormal,
     float3 lightDirection, 
     float random,
-    float rawDepth)
+    float rawDepth,
+	int shadingModelID)
 {
     const float invSamples = rcp((float)CONTACT_SHADOWS_SAMPLES);
 
-	worldPosition += worldNormal * CONTACT_SHADOWS_NORMAL_BIAS;
+    //approximation of how big a pixel is
+    //this is because at low resolutions biasing / noise issues get really bad
+    //but intrestingly at higher and higher resolutions the biasing/noise issues go away
+    //so this means that for the most part we should factor in the pixel scale of the render target
+    //for inv size, natrually lower resolutions will have a larger number (higher res lower)
+    //so we can use this to scale our set bias factor
+    float pixelSize = max(View_BufferSizeAndInvSize.z, View_BufferSizeAndInvSize.w);
+    pixelSize *= 100.0f; //this 100 is arbitrary
 
-    float3 rayOrigin = worldPosition + lightDirection * 1.0f;
+    float contactShadowBias = pixelSize * CONTACT_SHADOWS_BIAS;
+
+    if(shadingModelID == SHADINGMODELID_HAIR)
+		contactShadowBias = pixelSize * CONTACT_SHADOWS_BIAS_HAIR;
+
+	//apply normal bias to help mitigate self-shadowing issues
+    worldPosition += worldNormal * (pixelSize * CONTACT_SHADOWS_NORMAL_BIAS);
+
+    float3 rayOrigin = worldPosition + lightDirection * contactShadowBias;
     float3 rayEnd    = rayOrigin + lightDirection * CONTACT_SHADOWS_RAY_LENGTH;
 
     float4 clipStart = mul(View_WorldToClip, float4(rayOrigin, 1.0));
     float4 clipEnd   = mul(View_WorldToClip, float4(rayEnd, 1.0));
-
-    //float4 clipStart = mul(View_WorldToClip, float4(worldPosition + lightDirection * 1, 1.0));
-    //float4 clipEnd = mul(View_WorldToClip, float4(worldPosition + lightDirection * CONTACT_SHADOWS_RAY_LENGTH, 1.0));
 
     float3 ndcStart = clipStart.xyz / clipStart.w;
     float3 ndcEnd = clipEnd.xyz / clipEnd.w;
@@ -1134,36 +1175,59 @@ float FastContactShadowClipSpace(
 	// xy = scale (0.5, -0.5 on D3D), zw = bias (0.5, 0.5 + viewport offset + TAA jitter)
 	// if we don't we can (and have) end up in a case where due to some resolution mismatching
 	// contact shadows can have a lot of artifacts and seemingly appear "offset" or behind for some user graphics configs
-	float2 uvStart = mad(ndcStart.xy, View_ScreenPositionScaleBias.xy, View_ScreenPositionScaleBias.zw);
-	float2 uvEnd   = mad(ndcEnd.xy,   View_ScreenPositionScaleBias.xy, View_ScreenPositionScaleBias.zw);
+	//IMPORTANT NOTE 2: WATCH THAT SWIZZLE! it needs to be wz not zw... otherwise we get scaling issues at non standard resolutions
+	float2 uvStart = mad(ndcStart.xy, View_ScreenPositionScaleBias.xy, View_ScreenPositionScaleBias.wz);
+	float2 uvEnd   = mad(ndcEnd.xy,   View_ScreenPositionScaleBias.xy, View_ScreenPositionScaleBias.wz);
+
 	float2 uvStep  = (uvEnd - uvStart) * invSamples;
 	float2 uv      = mad(uvStep, random, uvStart);
+
+	float occlusion = 1.0f;
 
     [unroll]
     for (int i = 0; i < CONTACT_SHADOWS_SAMPLES; ++i)
     {
+		//OPTIMIZATION: early out when our sample UV goes past screen edges
         if (any(uv < 0.0) || any(uv > 1.0))
-        {
             break;
-        }
 
         float deviceDepth = SceneTexturesStruct_SceneDepthTexture.SampleLevel(View_SharedPointClampedSampler, uv, 0.0).r;
         float sceneDepth = LinearEyeDepth(deviceDepth);
         float penetration = rayDepth - sceneDepth;
 
-        if (penetration > CONTACT_SHADOWS_BIAS && penetration < CONTACT_SHADOWS_THICKNESS)
-        {
-            return 0.0;
-        }
+		#if defined(CONTACT_SHADOWS_FALLOFF)
+			if (penetration > contactShadowBias && penetration < CONTACT_SHADOWS_THICKNESS)
+			{
+				//how far along the ray are we? (we are going from point towards the light)
+				float rayProgress = i * invSamples;
+				float thicknessFade = 1.0 - saturate((penetration - contactShadowBias) / (CONTACT_SHADOWS_THICKNESS - contactShadowBias));
+				float distanceFade = 1.0 - saturate(rayProgress);
+				float sampleShadow = 1.0 - distanceFade;
+				sampleShadow *= sampleShadow;
+
+				occlusion = min(occlusion, sampleShadow);
+			}
+		#else
+			//NOTE TO SELF: while this is simple and fast, leaves a harsh cutoff
+			//for thickness we can calculate a "weight" to do a smoother falloff out from shadow
+			if (penetration > contactShadowBias && penetration < CONTACT_SHADOWS_THICKNESS)
+				return 0.0;
+		#endif
 
         rayDepth += rayDepthStep;
         uv += uvStep;
     }
 
-    return 1.0;
+	//when introducing the falloff shadows can appear a little too light
+	//to compensate especially near contacts we have a contrast factor here
+	#if defined(CONTACT_SHADOWS_FALLOFF)
+		occlusion = pow(occlusion, CONTACT_SHADOWS_FALLOFF_CONTRAST);
+	#endif
+
+    return occlusion;
 }
 
-float CalculateContactShadows(int2 pixelPos, float3 worldPosition, float3 worldNormal, float3 lightDirection, float rawDepth, float random)
+float CalculateContactShadows(int2 pixelPos, float3 worldPosition, float3 worldNormal, float3 lightDirection, float rawDepth, float random, int shadingModelID)
 {
     #if defined(CONTACT_SHADOW_EARLY_SKY_OUT)
         if (LinearizeSceneDepth(rawDepth) >= 1000000.0)
@@ -1179,7 +1243,7 @@ float CalculateContactShadows(int2 pixelPos, float3 worldPosition, float3 worldN
         if (checkerboardTest)
     #endif
     {
-        contactShadow = FastContactShadowClipSpace(worldPosition, worldNormal, lightDirection, random, rawDepth);
+        contactShadow = FastContactShadowClipSpace(worldPosition, worldNormal, lightDirection, random, rawDepth, shadingModelID);
     }
 
     #if defined(CONTACT_SHADOW_CHECKERBOARD) && defined(CONTACT_SHADOW_CHECKERBOARD_QUAD_RECONSTRUCTION)
@@ -1737,15 +1801,15 @@ PSOutput main(PSInput input)
     //optimization: early out if we are too far from a light
     if (resolvedPixel.DistanceAttenuation <= 0.0)
     {
-        output.Color = float4(0, 0, 0, 0);
-        return output;
+        //output.Color = float4(0, 0, 0, 0);
+        //return output;
     }
 
     //optimization: early out if we are already in shadow (from the shadowmap)
     if (resolvedPixel.ShadowedLightAttenuation <= 0.0)
     {
-        output.Color = float4(0, 0, 0, 0);
-        return output;
+        //output.Color = float4(0, 0, 0, 0);
+        //return output;
     }
 
     FLightingTerms terms = ShadeMaterial(graphicsBuffer, resolvedPixel, light);
@@ -1776,7 +1840,7 @@ PSOutput main(PSInput input)
             float random = 1.0f;
         #endif
 
-		float contactShadow = CalculateContactShadows(pixelPos, resolvedPixel.WorldPosition, graphicsBuffer.WorldNormal, resolvedPixel.LightVector, graphicsBuffer.DeviceDepth, random);
+		float contactShadow = CalculateContactShadows(pixelPos, resolvedPixel.WorldPosition, graphicsBuffer.WorldNormal, resolvedPixel.LightVector, graphicsBuffer.DeviceDepth, random, graphicsBuffer.ShadingModelID);
 		
         //===========================================================
         //added controls (some users want to disable contact shadows for specific materials)
