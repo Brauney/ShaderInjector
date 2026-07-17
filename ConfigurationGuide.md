@@ -19,7 +19,7 @@ The raw .hlsl shader source code files are located in ```(game directory)/Shader
 
 # Maximum Visual Quality Configuration
 
-By default as of 2.0 SSGI and it's AO counterpart along with auto exposure are disabled. To match the visual fedlity as seen in promotional screenshots and videos heres how to enable them.
+By default as of 2.0 SSGI and it's AO counterpart along with auto exposure are disabled. To match the visual fidelity as seen in promotional screenshots and videos heres how to enable them.
 
 ### SSGI / AO
 
