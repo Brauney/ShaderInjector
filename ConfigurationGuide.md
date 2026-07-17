@@ -1,5 +1,15 @@
 # Configuration Guide
 
+#### Contents
+
+- [Maximum Visual Quality Configuration](#maximum-visual-quality-configuration)
+    - [SSGI / AO](#ssgi--ao)
+    - [Auto Exposure](#auto-exposure)
+    - [Tonemapping](#tonemapping)
+    - [Bloom](#bloom)
+- [Other Configuration Notes](#other-configuration-notes)
+    - [Image Adjustments](#image-adjustments)
+
 *NOTE: This was written at the release of 2.0, with newer updates this might become more out of date but the general principles are the same.*
 
 With the release of 2.0 it comes with a whole suite of new shaders and features that drastically improve the lighting quality of the game! **However...**
@@ -181,7 +191,7 @@ You should see immediate visual changes after compilation completes, depending o
 
 # Other Configuration Notes
 
-### Overall Image Brightness
+### Image Adjustments
 
 ```
 ~FINAL FANTASY VII REBIRTH\End\Binaries\Win64\ShaderInjector\ModifiedShaders\Includes\PixelShaderPass_PostProcessFinal.hlsl
