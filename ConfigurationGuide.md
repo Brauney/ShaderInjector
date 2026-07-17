@@ -45,6 +45,8 @@ To enable them, just simply get rid of the two forward slashes on each of them l
 #define SSGI_BOUNCE_LIGHT
 ```
 
+NOTE: If you don't like the noise introduced by ```SSGI_BOUNCE_LIGHT``` you can leave it disabled and just enable ```SSGI_AMBIENT_OCCLUSION``` to get the massively improved occlusion.
+
 Save changes to the file and tab or open the game back up, and click ```Recompile All```.
 
 ![recompile-all](GithubContent/LiveShaderEditing/recompile-all.png)
