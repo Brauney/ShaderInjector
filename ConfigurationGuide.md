@@ -53,9 +53,7 @@ You should see immediate visual changes after compilation completes, with more v
 
 #### SSGI / AO Quality Notes
 
-Currently as of 2.0 these effects, especially ```SSGI_BOUNCE_LIGHT``` can be quite noisy. I plan to improve upon this in the future by introducing dedicated draw passes to filter and downsample the effects for performance/image quality but your kind of limited in terms of how to deal with the noise. 
-
-With that said there are some things you can try.
+Currently as of 2.0 these effects, especially ```SSGI_BOUNCE_LIGHT``` can be quite noisy. I plan to improve upon this in the future by introducing dedicated draw passes to filter and downsample the effects for performance/image quality but your kind of limited in terms of how to deal with the noise at the moment. With that said there are some things you can try...
 
 - Increase Rendering Resolution: This will make the impact of the SSGI signifcantly higher because it scales with screen resolution, but more pixels means the noise becomes smaller and the final result appears cleaner.
 - Increase Raymarch Sample Counts: This will improve the quality of the raymarch and reduce noise but of course at a greater cost.
