@@ -244,14 +244,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Build\FinalizeRelease.ps1" />
-    <None Include="Build\RELEASE_SECURITY.md" />
-  </ItemGroup>
-  <ItemGroup>
-    <ResourceCompile Include="ShaderInjector.rc" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Build\FinalizeRelease.ps1" />
-    <None Include="Build\Signing.md" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
