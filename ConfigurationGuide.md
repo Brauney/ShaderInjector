@@ -23,8 +23,6 @@ By default as of 2.0 SSGI and it's AO counterpart along with auto exposure are d
 
 ### SSGI / AO
 
-Find the following file....
-
 ```
 ~FINAL FANTASY VII REBIRTH\End\Binaries\Win64\ShaderInjector\ModifiedShaders\Includes\ComputeShaderPass_ReflectionEnvironment.hlsl
 ```
@@ -63,8 +61,6 @@ Currently as of 2.0 these effects, especially ```SSGI_BOUNCE_LIGHT``` can be qui
 
 ### Auto Exposure
 
-Find the following file....
-
 ```
 ~FINAL FANTASY VII REBIRTH\End\Binaries\Win64\ShaderInjector\ModifiedShaders\Includes\PixelShaderPass_PostProcessFinal.hlsl
 ```
@@ -88,8 +84,6 @@ Save changes to the file and tab or open the game back up, and click ```Recompil
 You should see immediate visual changes after compilation completes, with more visible ambient occlusion and local bounce light!
 
 ### Tonemapping
-
-Find the following file....
 
 ```
 ~FINAL FANTASY VII REBIRTH\End\Binaries\Win64\ShaderInjector\ModifiedShaders\Includes\PixelShaderPass_PostProcessFinal.hlsl
@@ -151,8 +145,6 @@ You should see immediate visual changes after compilation completes, with differ
 
 ### Bloom
 
-Find the following file....
-
 ```
 ~FINAL FANTASY VII REBIRTH\End\Binaries\Win64\ShaderInjector\ModifiedShaders\Includes\PixelShaderPass_PostProcessFinal.hlsl
 ```
@@ -186,3 +178,34 @@ Save changes to the file and tab or open the game back up, and click ```Recompil
 ![recompile-all](GithubContent/LiveShaderEditing/recompile-all.png)
 
 You should see immediate visual changes after compilation completes, depending on the area you'll see bloom more prevelant.
+
+# Other Configuration Notes
+
+### Overall Image Brightness
+
+```
+~FINAL FANTASY VII REBIRTH\End\Binaries\Win64\ShaderInjector\ModifiedShaders\Includes\PixelShaderPass_PostProcessFinal.hlsl
+```
+
+Open this file in a text/code editor and you'll find the following fields...
+
+```GLSL
+#define ADJUSTMENT_BRIGHTNESS_EV 0.0
+#define ADJUSTMENT_CONTRAST 1.0
+#define ADJUSTMENT_CONTRAST_PIVOT 0.18
+#define ADJUSTMENT_SATURATION 1.0
+#define ADJUSTMENT_VIBRANCE 0.0
+#define ADJUSTMENT_TINT_COLOR float3(1.0, 1.0, 1.0)
+#define ADJUSTMENT_TINT_FACTOR 0.0
+#define ADJUSTMENT_GAMMA 1.0
+#define ADJUSTMENT_LIFT float3(0.0, 0.0, 0.0)
+#define ADJUSTMENT_GAIN float3(1.0, 1.0, 1.0)
+```
+
+If the image is too dark for you, or in some areas I would advise using these controls and changing the values to tune the image in a way that is acceptable to you.
+
+Save changes to the file and tab or open the game back up, and click ```Recompile All```.
+
+![recompile-all](GithubContent/LiveShaderEditing/recompile-all.png)
+
+You should see immediate visual changes after compilation completes, with more visible ambient occlusion and local bounce light!
