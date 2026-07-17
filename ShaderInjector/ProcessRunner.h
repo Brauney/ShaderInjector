@@ -25,5 +25,4 @@ namespace ProcessRunner
 	std::string GetEnvironmentVariable(const std::string& variableName);
 	std::string GetCurrentExecutablePath();
 	std::string GetLoadedModulePath(const std::string& moduleName);
-	std::vector<std::string> FindProcessExecutablePaths(const std::string& executableName);
 }

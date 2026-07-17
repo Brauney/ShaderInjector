@@ -280,6 +280,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Build\FinalizeRelease.ps1" />
+    <None Include="Build\RELEASE_SECURITY.md" />
     <None Include="Build\Signing.md" />
   </ItemGroup>
 </Project>

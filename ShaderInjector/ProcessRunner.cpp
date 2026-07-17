@@ -1,16 +1,12 @@
 // ProcessRunner.cpp
 #include "ProcessRunner.h"
 
-#include <algorithm>
-#include <cctype>
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
-#include <filesystem>
 
 #if defined(_WIN32)
 	#include <Windows.h>
-	#include <tlhelp32.h>
 #else
 	#include <fcntl.h>
 	#include <limits.h>
@@ -293,70 +289,4 @@ namespace ProcessRunner
 #endif
 	}
 
-	std::vector<std::string> FindProcessExecutablePaths(const std::string& executableName)
-	{
-		std::vector<std::string> executablePaths;
-
-		if (executableName.empty())
-			return executablePaths;
-
-#if defined(_WIN32)
-		const HANDLE processSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-
-		if (processSnapshot == INVALID_HANDLE_VALUE)
-			return executablePaths;
-
-		PROCESSENTRY32W processEntry{};
-		processEntry.dwSize = sizeof(processEntry);
-
-		if (Process32FirstW(processSnapshot, &processEntry))
-		{
-			do
-			{
-				if (!StringHelper::EqualsIgnoreCase(StringHelper::WideToUtf8(processEntry.szExeFile), executableName))
-					continue;
-
-				const HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processEntry.th32ProcessID);
-				if (!process)
-					continue;
-
-				std::vector<wchar_t> executablePath(32768, L'\0');
-				DWORD executablePathLength = static_cast<DWORD>(executablePath.size());
-
-				if (QueryFullProcessImageNameW(process, 0, executablePath.data(), &executablePathLength))
-				{
-					executablePaths.push_back(
-						StringHelper::WideToUtf8(std::wstring(executablePath.data(), executablePathLength)));
-				}
-
-				CloseHandle(process);
-			} while (Process32NextW(processSnapshot, &processEntry));
-		}
-
-		CloseHandle(processSnapshot);
-#else
-		namespace FileSystem = std::filesystem;
-		std::error_code error;
-
-		for (const FileSystem::directory_entry& processDirectory : FileSystem::directory_iterator("/proc", error))
-		{
-			if (error)
-				break;
-
-			const std::string processId = processDirectory.path().filename().string();
-
-			if (processId.empty() || !std::all_of(processId.begin(), processId.end(), ::isdigit))
-				continue;
-
-			const FileSystem::path executablePath = FileSystem::read_symlink(processDirectory.path() / "exe", error);
-
-			if (!error && StringHelper::EqualsIgnoreCase(executablePath.filename().string(), executableName))
-				executablePaths.push_back(executablePath.string());
-
-			error.clear();
-		}
-#endif
-
-		return executablePaths;
-	}
 }

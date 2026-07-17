@@ -83,14 +83,6 @@ namespace RenderDocIntegration
 				candidates.push_back(std::move(candidate));
 		}
 
-		void AddRunningRenderDocCandidates(std::vector<std::string>& candidates)
-		{
-			for (const std::string& executablePath : ProcessRunner::FindProcessExecutablePaths("qrenderdoc.exe"))
-			{
-				AddLibraryCandidate(candidates, ShaderInjectorIO::DirectoryFromPath(executablePath));
-			}
-		}
-
 		std::vector<std::string> CollectInstalledLibraryCandidates()
 		{
 			std::vector<std::string> candidates;
@@ -98,9 +90,6 @@ namespace RenderDocIntegration
 			// Explicit environment overrides support portable RenderDoc installs and Wine prefixes.
 			AddLibraryCandidate(candidates, ProcessRunner::GetEnvironmentVariable("SHADER_INJECTOR_RENDERDOC_PATH"));
 			AddLibraryCandidate(candidates, ProcessRunner::GetEnvironmentVariable("RENDERDOC_PATH"));
-
-			// Prefer the capture library beside the exact RenderDoc UI the user already opened.
-			AddRunningRenderDocCandidates(candidates);
 
 			const std::string renderDocOpenCommandKey = "SOFTWARE\\Classes\\RenderDoc.RDCCapture.1\\shell\\open\\command";
 			const std::string machineRegisteredExecutable = StringHelper::ExecutablePathFromCommandLine(ShaderInjectorIO::ReadRegistryString(ShaderInjectorIO::RegistryHive::LocalMachine, renderDocOpenCommandKey));

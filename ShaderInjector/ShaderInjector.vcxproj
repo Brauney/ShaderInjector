@@ -137,6 +137,9 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>PreCompiledHeader.h</PrecompiledHeaderFile>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <BufferSecurityCheck>true</BufferSecurityCheck>
+      <ControlFlowGuard>Guard</ControlFlowGuard>
       <AdditionalIncludeDirectories>$(ProjectDir)Resources;$(ProjectDir)ExternalDependencies\json\nlohmann;$(ProjectDir)ExternalDependencies\imgui-1.92.8;$(ProjectDir)ExternalDependencies\imgui-1.92.8\backends;$(ProjectDir)ExternalDependencies\MinHook_134\include;$(ProjectDir)ExternalDependencies\inifile-cpp\include;$(ProjectDir)ExternalDependencies\renderdoc\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeaderOutputFile>$(IntDir)$(TargetName).PreCompiledHeader</PrecompiledHeaderOutputFile>
     </ClCompile>
@@ -148,6 +151,11 @@
       <EnableUAC>false</EnableUAC>
       <ModuleDefinitionFile>$(ProjectDir)exports.def</ModuleDefinitionFile>
       <AdditionalDependencies>d3d12.lib;dxgi.lib;$(ProjectDir)ExternalDependencies\MinHook_134\lib\libMinHook.x64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <ControlFlowGuard>Guard</ControlFlowGuard>
+      <RandomizedBaseAddress>true</RandomizedBaseAddress>
+      <DataExecutionPrevention>true</DataExecutionPrevention>
+      <ProgramDatabaseFile>$(OutDir)$(TargetName).pdb</ProgramDatabaseFile>
+      <AdditionalOptions>/CETCOMPAT /HIGHENTROPYVA /RELEASE /PDBALTPATH:%_PDB% %(AdditionalOptions)</AdditionalOptions>
     </Link>
 	<PostBuildEvent>
 	  <Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(ProjectDir)Build\FinalizeRelease.ps1" -TargetPath "$(TargetPath)"</Command>
@@ -244,6 +252,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Build\FinalizeRelease.ps1" />
+    <None Include="Build\RELEASE_SECURITY.md" />
+    <None Include="Build\Signing.md" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
