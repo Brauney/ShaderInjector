@@ -146,3 +146,41 @@ Save changes to the file and tab or open the game back up, and click ```Recompil
 ![recompile-all](GithubContent/LiveShaderEditing/recompile-all.png)
 
 You should see immediate visual changes after compilation completes, with different tonal range and better color accuracy than the base game!
+
+### Bloom
+
+Find the following file....
+
+```
+~FINAL FANTASY VII REBIRTH\End\Binaries\Win64\ShaderInjector\ModifiedShaders\Includes\PixelShaderPass_PostProcessFinal.hlsl
+```
+
+Open this file in a text/code editor and you'll find the following fields...
+
+```GLSL
+#define BLOOM_ENABLE
+
+//#define BLOOM_PHYSICAL
+#define BLOOM_PHYSICAL_INTENSITY 0.125
+
+//#define BLOOM_ADDITIVE
+#define BLOOM_ADDITIVE_INTENSITY 2
+```
+
+Bloom is enabled by default and is the original game behavior, however I have implemented an adjusted version that is more naturalistic which is ```BLOOM_PHYSICAL```. I prefer to use this one due to how natrual it makes the image.
+
+```GLSL
+#define BLOOM_ENABLE
+
+#define BLOOM_PHYSICAL
+#define BLOOM_PHYSICAL_INTENSITY 0.125
+
+//#define BLOOM_ADDITIVE
+#define BLOOM_ADDITIVE_INTENSITY 2
+```
+
+Save changes to the file and tab or open the game back up, and click ```Recompile All```.
+
+![recompile-all](GithubContent/LiveShaderEditing/recompile-all.png)
+
+You should see immediate visual changes after compilation completes, depending on the area you'll see bloom more prevelant.
