@@ -13,7 +13,7 @@
 
 namespace HookD3D12
 {
-	void FillCommonReplacementHashes(ShaderReplacement::ShaderReplacementDisk& replacement, uint64_t vsHash, uint64_t psHash, uint64_t csHash, uint64_t gsHash, uint64_t hsHash, uint64_t dsHash)
+	void FillCommonReplacementHashes(ShaderTarget::ShaderTargetDisk& replacement, uint64_t vsHash, uint64_t psHash, uint64_t csHash, uint64_t gsHash, uint64_t hsHash, uint64_t dsHash)
 	{
 		replacement.vsHash = vsHash ? Hash::FormatHash(vsHash) : "";
 		replacement.psHash = psHash ? Hash::FormatHash(psHash) : "";
@@ -23,7 +23,7 @@ namespace HookD3D12
 		replacement.dsHash = dsHash ? Hash::FormatHash(dsHash) : "";
 	}
 
-	void FillCommonReplacementStageLengths(ShaderReplacement::ShaderReplacementDisk& replacement, SIZE_T vsSize, SIZE_T psSize, SIZE_T csSize, SIZE_T gsSize, SIZE_T hsSize, SIZE_T dsSize)
+	void FillCommonReplacementStageLengths(ShaderTarget::ShaderTargetDisk& replacement, SIZE_T vsSize, SIZE_T psSize, SIZE_T csSize, SIZE_T gsSize, SIZE_T hsSize, SIZE_T dsSize)
 	{
 		replacement.vsLength = vsSize ? std::to_string((size_t)vsSize) : "";
 		replacement.psLength = psSize ? std::to_string((size_t)psSize) : "";
@@ -140,7 +140,7 @@ namespace HookD3D12
 		return stream.str();
 	}
 
-	void FillInputAndStreamOutputSignatures(ShaderReplacement::ShaderReplacementDisk& replacement, const std::vector<D3D12_INPUT_ELEMENT_DESC>& inputElements, const std::vector<D3D12_SO_DECLARATION_ENTRY>& soDeclarations, const std::vector<UINT>& soStrides)
+	void FillInputAndStreamOutputSignatures(ShaderTarget::ShaderTargetDisk& replacement, const std::vector<D3D12_INPUT_ELEMENT_DESC>& inputElements, const std::vector<D3D12_SO_DECLARATION_ENTRY>& soDeclarations, const std::vector<UINT>& soStrides)
 	{
 		replacement.inputLayoutElementCount = std::to_string(inputElements.size());
 		replacement.inputLayoutSignature = InputLayoutSignature(inputElements);
@@ -148,7 +148,7 @@ namespace HookD3D12
 		replacement.streamOutputSignature = StreamOutputSignature(soDeclarations, soStrides);
 	}
 
-	void FillGraphicsReplacementPortableState(ShaderReplacement::ShaderReplacementDisk& replacement, const GraphicsPipelineInfo& pipeline)
+	void FillGraphicsReplacementPortableState(ShaderTarget::ShaderTargetDisk& replacement, const GraphicsPipelineInfo& pipeline)
 	{
 		FillCommonReplacementStageLengths(replacement, pipeline.vsSize, pipeline.psSize, 0, pipeline.gsSize, pipeline.hsSize, pipeline.dsSize);
 		FillInputAndStreamOutputSignatures(replacement, pipeline.inputElements, pipeline.soDeclarations, pipeline.soStrides);
@@ -166,9 +166,13 @@ namespace HookD3D12
 		replacement.depthStencilStateHash = HashStructText(&pipeline.originalDesc.DepthStencilState, sizeof(pipeline.originalDesc.DepthStencilState));
 	}
 
-	void FillStreamReplacementPortableStateFromBlob(ShaderReplacement::ShaderReplacementDisk& replacement, const PipelineStateInfo& pipeline)
+	void FillStreamReplacementPortableStateFromBlob(ShaderTarget::ShaderTargetDisk& replacement, const PipelineStateInfo& pipeline)
 	{
 		FillCommonReplacementStageLengths(replacement, pipeline.vsSize, pipeline.psSize, pipeline.csSize, pipeline.gsSize, pipeline.hsSize, pipeline.dsSize);
+		replacement.asLength = pipeline.asSize ? std::to_string((size_t)pipeline.asSize) : "";
+		replacement.msLength = pipeline.msSize ? std::to_string((size_t)pipeline.msSize) : "";
+		replacement.asHash = pipeline.asHash ? Hash::FormatHash(pipeline.asHash) : "";
+		replacement.msHash = pipeline.msHash ? Hash::FormatHash(pipeline.msHash) : "";
 		FillInputAndStreamOutputSignatures(replacement, pipeline.inputElements, pipeline.soDeclarations, pipeline.soStrides);
 		replacement.pipelineStreamLength = pipeline.streamBlob.empty() ? "" : std::to_string(pipeline.streamBlob.size());
 		replacement.pipelineStreamSubobjectTypes = PipelineStreamSubobjectTypeSignature(pipeline.streamBlob);
@@ -190,64 +194,64 @@ namespace HookD3D12
 			if (ptr + subobjectSize > end)
 				break;
 
-			const uint8_t* payloadPtr = ptr + sizeof(void*);
 			switch (type)
 			{
 				case D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_BLEND:
 				{
-					auto* desc = reinterpret_cast<const D3D12_BLEND_DESC*>(payloadPtr);
-					replacement.blendStateHash = HashStructText(desc, sizeof(*desc));
+					const auto* subobject = reinterpret_cast<const PSOSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_BLEND, D3D12_BLEND_DESC>*>(ptr);
+					replacement.blendStateHash = HashStructText(&subobject->payload, sizeof(subobject->payload));
 					break;
 				}
 				case D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_SAMPLE_MASK:
 				{
-					auto* sampleMask = reinterpret_cast<const UINT*>(payloadPtr);
-					replacement.sampleMask = std::to_string(*sampleMask);
+					const auto* subobject = reinterpret_cast<const PSOSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_SAMPLE_MASK, UINT>*>(ptr);
+					replacement.sampleMask = std::to_string(subobject->payload);
 					break;
 				}
 				case D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RASTERIZER:
 				{
-					auto* desc = reinterpret_cast<const D3D12_RASTERIZER_DESC*>(payloadPtr);
-					replacement.rasterizerStateHash = HashStructText(desc, sizeof(*desc));
+					const auto* subobject = reinterpret_cast<const PSOSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RASTERIZER, D3D12_RASTERIZER_DESC>*>(ptr);
+					replacement.rasterizerStateHash = HashStructText(&subobject->payload, sizeof(subobject->payload));
 					break;
 				}
 				case D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL:
 				{
-					auto* desc = reinterpret_cast<const D3D12_DEPTH_STENCIL_DESC*>(payloadPtr);
-					replacement.depthStencilStateHash = HashStructText(desc, sizeof(*desc));
+					const auto* subobject = reinterpret_cast<const PSOSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL, D3D12_DEPTH_STENCIL_DESC>*>(ptr);
+					replacement.depthStencilStateHash = HashStructText(&subobject->payload, sizeof(subobject->payload));
 					break;
 				}
 				case D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PRIMITIVE_TOPOLOGY:
 				{
-					auto* topology = reinterpret_cast<const D3D12_PRIMITIVE_TOPOLOGY_TYPE*>(payloadPtr);
-					replacement.primitiveTopologyType = std::to_string((UINT)*topology);
+					const auto* subobject = reinterpret_cast<const PSOSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PRIMITIVE_TOPOLOGY, D3D12_PRIMITIVE_TOPOLOGY_TYPE>*>(ptr);
+					replacement.primitiveTopologyType = std::to_string((UINT)subobject->payload);
 					break;
 				}
 				case D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RENDER_TARGET_FORMATS:
 				{
-					auto* formats = reinterpret_cast<const D3D12_RT_FORMAT_ARRAY*>(payloadPtr);
-					replacement.numRenderTargets = std::to_string(formats->NumRenderTargets);
-					replacement.renderTargetFormat0 = formats->NumRenderTargets > 0 ? std::to_string((UINT)formats->RTFormats[0]) : "";
-					replacement.renderTargetFormats = RenderTargetFormatsSignature(formats->RTFormats, formats->NumRenderTargets);
+					const auto* subobject = reinterpret_cast<const PSOSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RENDER_TARGET_FORMATS, D3D12_RT_FORMAT_ARRAY>*>(ptr);
+					const D3D12_RT_FORMAT_ARRAY& formats = subobject->payload;
+					replacement.numRenderTargets = std::to_string(formats.NumRenderTargets);
+					replacement.renderTargetFormat0 = formats.NumRenderTargets > 0 ? std::to_string((UINT)formats.RTFormats[0]) : "";
+					replacement.renderTargetFormats = RenderTargetFormatsSignature(formats.RTFormats, formats.NumRenderTargets);
 					break;
 				}
 				case D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL_FORMAT:
 				{
-					auto* format = reinterpret_cast<const DXGI_FORMAT*>(payloadPtr);
-					replacement.depthStencilFormat = std::to_string((UINT)*format);
+					const auto* subobject = reinterpret_cast<const PSOSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL_FORMAT, DXGI_FORMAT>*>(ptr);
+					replacement.depthStencilFormat = std::to_string((UINT)subobject->payload);
 					break;
 				}
 				case D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_SAMPLE_DESC:
 				{
-					auto* sampleDesc = reinterpret_cast<const DXGI_SAMPLE_DESC*>(payloadPtr);
-					replacement.sampleCount = std::to_string(sampleDesc->Count);
-					replacement.sampleQuality = std::to_string(sampleDesc->Quality);
+					const auto* subobject = reinterpret_cast<const PSOSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_SAMPLE_DESC, DXGI_SAMPLE_DESC>*>(ptr);
+					replacement.sampleCount = std::to_string(subobject->payload.Count);
+					replacement.sampleQuality = std::to_string(subobject->payload.Quality);
 					break;
 				}
 				case D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL1:
 				{
-					auto* desc = reinterpret_cast<const D3D12_DEPTH_STENCIL_DESC1*>(payloadPtr);
-					replacement.depthStencilStateHash = HashStructText(desc, sizeof(*desc));
+					const auto* subobject = reinterpret_cast<const PSOSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL1, D3D12_DEPTH_STENCIL_DESC1>*>(ptr);
+					replacement.depthStencilStateHash = HashStructText(&subobject->payload, sizeof(subobject->payload));
 					break;
 				}
 				default:
@@ -258,13 +262,13 @@ namespace HookD3D12
 		}
 	}
 
-	ShaderReplacement::ShaderPipelineStreamMetadataDisk BuildPipelineStreamMetadata(const PipelineStateInfo& pipeline)
+	ShaderTarget::ShaderPipelineStreamMetadataDisk BuildPipelineStreamMetadata(const PipelineStateInfo& pipeline)
 	{
-		ShaderReplacement::ShaderPipelineStreamMetadataDisk metadata{};
+		ShaderTarget::ShaderPipelineStreamMetadataDisk metadata{};
 
 		for (const D3D12_INPUT_ELEMENT_DESC& element : pipeline.inputElements)
 		{
-			ShaderReplacement::ShaderInputElementDisk diskElement{};
+			ShaderTarget::ShaderInputElementDisk diskElement{};
 			diskElement.semanticName = element.SemanticName ? element.SemanticName : "";
 			diskElement.semanticIndex = element.SemanticIndex;
 			diskElement.format = (uint32_t)element.Format;
@@ -277,7 +281,7 @@ namespace HookD3D12
 
 		for (const D3D12_SO_DECLARATION_ENTRY& entry : pipeline.soDeclarations)
 		{
-			ShaderReplacement::ShaderStreamOutputDeclarationDisk diskEntry{};
+			ShaderTarget::ShaderStreamOutputDeclarationDisk diskEntry{};
 			diskEntry.semanticName = entry.SemanticName ? entry.SemanticName : "";
 			diskEntry.semanticIndex = entry.SemanticIndex;
 			diskEntry.startComponent = entry.StartComponent;
@@ -292,7 +296,7 @@ namespace HookD3D12
 		return metadata;
 	}
 
-	void ApplyPipelineStreamMetadata(const ShaderReplacement::ShaderPipelineStreamMetadataDisk& metadata, PipelineStateInfo& pipeline)
+	void ApplyPipelineStreamMetadata(const ShaderTarget::ShaderPipelineStreamMetadataDisk& metadata, PipelineStateInfo& pipeline)
 	{
 		pipeline.inputElements.clear();
 		pipeline.inputElementSemanticNames.clear();
@@ -303,7 +307,7 @@ namespace HookD3D12
 		pipeline.inputElements.reserve(metadata.inputElements.size());
 		pipeline.inputElementSemanticNames.reserve(metadata.inputElements.size());
 
-		for (const ShaderReplacement::ShaderInputElementDisk& diskElement : metadata.inputElements)
+		for (const ShaderTarget::ShaderInputElementDisk& diskElement : metadata.inputElements)
 		{
 			pipeline.inputElementSemanticNames.push_back(diskElement.semanticName);
 
@@ -321,7 +325,7 @@ namespace HookD3D12
 		pipeline.soDeclarations.reserve(metadata.streamOutputDeclarations.size());
 		pipeline.soSemanticNames.reserve(metadata.streamOutputDeclarations.size());
 
-		for (const ShaderReplacement::ShaderStreamOutputDeclarationDisk& diskEntry : metadata.streamOutputDeclarations)
+		for (const ShaderTarget::ShaderStreamOutputDeclarationDisk& diskEntry : metadata.streamOutputDeclarations)
 		{
 			pipeline.soSemanticNames.push_back(diskEntry.semanticName);
 
@@ -467,6 +471,30 @@ namespace HookD3D12
 						info.csBytecode.assign((const uint8_t*)subobj->payload.pShaderBytecode, (const uint8_t*)subobj->payload.pShaderBytecode + subobj->payload.BytecodeLength);
 					}
 					info.isCompute = true;
+					break;
+				}
+				case D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_AS:
+				{
+					auto* subobj = reinterpret_cast<const PSOSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_AS, D3D12_SHADER_BYTECODE>*>(ptr);
+					if (subobj->payload.pShaderBytecode && subobj->payload.BytecodeLength)
+					{
+						info.asHash = Hash::HashMemory(subobj->payload.pShaderBytecode, subobj->payload.BytecodeLength);
+						info.asSize = subobj->payload.BytecodeLength;
+						info.asBytecode.assign((const uint8_t*)subobj->payload.pShaderBytecode, (const uint8_t*)subobj->payload.pShaderBytecode + subobj->payload.BytecodeLength);
+					}
+					info.isGraphics = true;
+					break;
+				}
+				case D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_MS:
+				{
+					auto* subobj = reinterpret_cast<const PSOSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_MS, D3D12_SHADER_BYTECODE>*>(ptr);
+					if (subobj->payload.pShaderBytecode && subobj->payload.BytecodeLength)
+					{
+						info.msHash = Hash::HashMemory(subobj->payload.pShaderBytecode, subobj->payload.BytecodeLength);
+						info.msSize = subobj->payload.BytecodeLength;
+						info.msBytecode.assign((const uint8_t*)subobj->payload.pShaderBytecode, (const uint8_t*)subobj->payload.pShaderBytecode + subobj->payload.BytecodeLength);
+					}
+					info.isGraphics = true;
 					break;
 				}
 				case D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_INPUT_LAYOUT:

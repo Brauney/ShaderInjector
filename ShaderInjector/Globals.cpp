@@ -27,6 +27,17 @@ namespace Globals
 
 	bool gShowShaderInjectorGUI = true;
 	bool gShaderInjectorEnabled = true;
+	bool gRenderDocIntegrationEnabled = false;
+	bool gRenderDocAutoAttachEnabled = false;
+
+	ShaderDiscoveryMode gShaderDiscoveryMode = ShaderDiscoveryMode::HashLookup;
+	int gShaderDiscoveryWorkerThreads = 0;
+	int gShaderDiscoveryWorkerThreadPriority = THREAD_PRIORITY_BELOW_NORMAL;
+	int gShaderDiscoveryFrameJobBudget = 8192;
+	int gShaderDiscoveryPendingAnalysisLimit = 64;
+	int gShaderDiscoveryQueuedShaderLimit = 8192;
+	double gShaderDiscoveryMinimumSimilarityScore = 0.90;
+	double gShaderDiscoverySimilarityAmbiguityMargin = 0.02;
 
 	std::vector<uint8_t> nullPixelShaderBlob;
 	std::vector<uint8_t> markerPixelShaderBlob;

@@ -1,9 +1,16 @@
 #pragma once
 
+#include <windows.h>
 #include <vector>
 
 namespace Globals
 {
+	enum class ShaderDiscoveryMode
+	{
+		HashLookup = 0,
+		ShaderAnalysis = 1,
+	};
+
 	// Handle to our DLL module
 	extern HMODULE mainModule;
 
@@ -20,6 +27,18 @@ namespace Globals
 	// observes the settings loaded from ShaderInjector.ini instead of keeping its own copy.
 	extern bool gShowShaderInjectorGUI;
 	extern bool gShaderInjectorEnabled;
+	extern bool gRenderDocIntegrationEnabled;
+	extern bool gRenderDocAutoAttachEnabled;
+
+	// Shader discovery tuning. WorkerThreads = 0 means automatic half-core scaling.
+	extern ShaderDiscoveryMode gShaderDiscoveryMode;
+	extern int gShaderDiscoveryWorkerThreads;
+	extern int gShaderDiscoveryWorkerThreadPriority;
+	extern int gShaderDiscoveryFrameJobBudget;
+	extern int gShaderDiscoveryPendingAnalysisLimit;
+	extern int gShaderDiscoveryQueuedShaderLimit;
+	extern double gShaderDiscoveryMinimumSimilarityScore;
+	extern double gShaderDiscoverySimilarityAmbiguityMargin;
 
 	extern std::vector<uint8_t> nullPixelShaderBlob;
 	extern std::vector<uint8_t> markerPixelShaderBlob;

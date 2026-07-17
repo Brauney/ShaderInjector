@@ -9,7 +9,7 @@
 #include <dxgi1_4.h>
 
 //custom
-#include "ShaderReplacement.h"
+#include "ShaderTarget.h"
 
 namespace HookD3D12
 {
@@ -54,8 +54,8 @@ namespace HookD3D12
 		sizeof(PSOSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_MS,                    D3D12_SHADER_BYTECODE>),
 	};
 
-	void FillCommonReplacementHashes(ShaderReplacement::ShaderReplacementDisk& replacement, uint64_t vsHash, uint64_t psHash, uint64_t csHash, uint64_t gsHash, uint64_t hsHash, uint64_t dsHash);
-	void FillCommonReplacementStageLengths(ShaderReplacement::ShaderReplacementDisk& replacement, SIZE_T vsSize, SIZE_T psSize, SIZE_T csSize, SIZE_T gsSize, SIZE_T hsSize, SIZE_T dsSize);
+	void FillCommonReplacementHashes(ShaderTarget::ShaderTargetDisk& replacement, uint64_t vsHash, uint64_t psHash, uint64_t csHash, uint64_t gsHash, uint64_t hsHash, uint64_t dsHash);
+	void FillCommonReplacementStageLengths(ShaderTarget::ShaderTargetDisk& replacement, SIZE_T vsSize, SIZE_T psSize, SIZE_T csSize, SIZE_T gsSize, SIZE_T hsSize, SIZE_T dsSize);
 
 	std::string HashStructText(const void* data, size_t size);
 	std::string JoinUIntValues(const UINT* values, UINT count);
@@ -64,13 +64,13 @@ namespace HookD3D12
 	std::string StreamOutputSignature(const std::vector<D3D12_SO_DECLARATION_ENTRY>& declarations, const std::vector<UINT>& strides);
 	std::string PipelineStreamSubobjectTypeSignature(const std::vector<uint8_t>& streamBlob);
 
-	void FillInputAndStreamOutputSignatures(ShaderReplacement::ShaderReplacementDisk& replacement, const std::vector<D3D12_INPUT_ELEMENT_DESC>& inputElements, const std::vector<D3D12_SO_DECLARATION_ENTRY>& soDeclarations, const std::vector<UINT>& soStrides);
-	void FillGraphicsReplacementPortableState(ShaderReplacement::ShaderReplacementDisk& replacement, const GraphicsPipelineInfo& pipeline);
-	void FillStreamReplacementPortableStateFromBlob(ShaderReplacement::ShaderReplacementDisk& replacement, const PipelineStateInfo& pipeline);
+	void FillInputAndStreamOutputSignatures(ShaderTarget::ShaderTargetDisk& replacement, const std::vector<D3D12_INPUT_ELEMENT_DESC>& inputElements, const std::vector<D3D12_SO_DECLARATION_ENTRY>& soDeclarations, const std::vector<UINT>& soStrides);
+	void FillGraphicsReplacementPortableState(ShaderTarget::ShaderTargetDisk& replacement, const GraphicsPipelineInfo& pipeline);
+	void FillStreamReplacementPortableStateFromBlob(ShaderTarget::ShaderTargetDisk& replacement, const PipelineStateInfo& pipeline);
 
-	ShaderReplacement::ShaderPipelineStreamMetadataDisk BuildPipelineStreamMetadata(const PipelineStateInfo& pipeline);
+	ShaderTarget::ShaderPipelineStreamMetadataDisk BuildPipelineStreamMetadata(const PipelineStateInfo& pipeline);
 
-	void ApplyPipelineStreamMetadata(const ShaderReplacement::ShaderPipelineStreamMetadataDisk& metadata, PipelineStateInfo& pipeline);
+	void ApplyPipelineStreamMetadata(const ShaderTarget::ShaderPipelineStreamMetadataDisk& metadata, PipelineStateInfo& pipeline);
 	void RebindPipelineStateInfoPointerFields(PipelineStateInfo& info);
 	void ParsePipelineStream(const D3D12_PIPELINE_STATE_STREAM_DESC* desc, PipelineStateInfo& info);
 	void GatherD3D12PipelineInfo(IDXGISwapChain3* swapChain, ID3D12Device* device, ID3D12CommandQueue* commandQueue, D3D12PipelineInfo& pipelineInfo);

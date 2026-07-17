@@ -80,7 +80,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;SHADERINJECTOR_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-	  <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
@@ -98,7 +98,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;SHADERINJECTOR_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-	  <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
@@ -116,7 +116,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;SHADERINJECTOR_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-	  <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
@@ -134,10 +134,10 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;SHADERINJECTOR_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-	  <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>PreCompiledHeader.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(ProjectDir)Resources;$(ProjectDir)ExternalDependencies\json\nlohmann;$(ProjectDir)ExternalDependencies\imgui-1.92.8;$(ProjectDir)ExternalDependencies\imgui-1.92.8\backends;$(ProjectDir)ExternalDependencies\MinHook_134\include;$(ProjectDir)ExternalDependencies\inifile-cpp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)Resources;$(ProjectDir)ExternalDependencies\json\nlohmann;$(ProjectDir)ExternalDependencies\imgui-1.92.8;$(ProjectDir)ExternalDependencies\imgui-1.92.8\backends;$(ProjectDir)ExternalDependencies\MinHook_134\include;$(ProjectDir)ExternalDependencies\inifile-cpp\include;$(ProjectDir)ExternalDependencies\renderdoc\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeaderOutputFile>$(IntDir)$(TargetName).PreCompiledHeader</PrecompiledHeaderOutputFile>
     </ClCompile>
     <Link>
@@ -156,8 +156,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="FPSCounter.h" />
-    <ClInclude Include="DatabaseShaderReplacements.h" />
-    <ClInclude Include="DatabaseShaderSources.h" />
+    <ClInclude Include="DatabaseShaderTargets.h" />
+    <ClInclude Include="DatabaseModifiedShaders.h" />
     <ClInclude Include="DatabaseGraphicsPSOs.h" />
     <ClInclude Include="Hash.h" />
     <ClInclude Include="HookD3D12.h" />
@@ -186,16 +186,17 @@
     <ClInclude Include="ShaderInjectorIO.h" />
     <ClInclude Include="ShaderInjectorSettings.h" />
     <ClInclude Include="DatabaseStreamPSOs.h" />
-    <ClInclude Include="ShaderReplacement.h" />
+    <ClInclude Include="ShaderTarget.h" />
     <ClInclude Include="ShaderTemplates.h" />
     <ClInclude Include="ShaderInjectorGUI.h" />
     <ClInclude Include="StringHelper.h" />
+    <ClInclude Include="SystemInfoLogger.h" />
     <ClInclude Include="VTableIndex.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="FPSCounter.cpp" />
-    <ClCompile Include="DatabaseShaderReplacements.cpp" />
-    <ClCompile Include="DatabaseShaderSources.cpp" />
+    <ClCompile Include="DatabaseShaderTargets.cpp" />
+    <ClCompile Include="DatabaseModifiedShaders.cpp" />
     <ClCompile Include="DatabaseGraphicsPSOs.cpp" />
     <ClCompile Include="Hash.cpp" />
     <ClCompile Include="HookD3D12.cpp" />
@@ -221,13 +222,29 @@
     <ClCompile Include="HookInput.cpp" />
     <ClCompile Include="dsound_proxy.cpp" />
     <ClCompile Include="Keycodes.cpp" />
-	<ClCompile Include="ProcessRunner.cpp" />
+    <ClCompile Include="ProcessRunner.cpp" />
+    <ClCompile Include="RenderDocIntegration.cpp" />
+    <ClCompile Include="ShaderAnalyzer.cpp" />
+    <ClCompile Include="ShaderAnalysis.cpp" />
+    <ClCompile Include="ShaderDiscovery.cpp" />
+    <ClCompile Include="ShaderAutomaticDiscovery.cpp" />
+    <ClCompile Include="ModifiedShader.cpp" />
+    <ClCompile Include="ModifiedShaderCreation.cpp" />
     <ClCompile Include="ShaderInjectorIO.cpp" />
     <ClCompile Include="DatabaseStreamPSOs.cpp" />
-    <ClCompile Include="ShaderReplacement.cpp" />
+    <ClCompile Include="ShaderTarget.cpp" />
+    <ClCompile Include="ShaderTargetSimilarity.cpp" />
     <ClCompile Include="ShaderTemplates.cpp" />
     <ClCompile Include="ShaderInjectorGUI.cpp" />
     <ClCompile Include="StringHelper.cpp" />
+    <ClCompile Include="SystemInfoLogger.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="ShaderInjector.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Build\FinalizeRelease.ps1" />
+    <None Include="Build\RELEASE_SECURITY.md" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="ShaderInjector.rc" />

@@ -6,6 +6,7 @@
 #include "DatabaseStreamPSOs.h"
 #include "HookD3D12PipelineRegistry.h"
 #include "HookD3D12PipelineUtils.h"
+#include "ShaderAutomaticDiscovery.h"
 
 namespace HookD3D12
 {
@@ -16,6 +17,8 @@ namespace HookD3D12
 		if (!pipelineStreamDescription || !pipelineStreamDescription->pPipelineStateSubobjectStream || pipelineStreamDescription->SizeInBytes == 0 || !pipelineState)
 			return;
 
+		NotifyPipelineActivity();
+
 		PipelineStateInfo capturedPipeline{};
 		capturedPipeline.pipelineState = pipelineState;
 
@@ -25,10 +28,14 @@ namespace HookD3D12
 
 		ParsePipelineStream(pipelineStreamDescription, capturedPipeline);
 
-		std::lock_guard<std::mutex> lock(gPipelineMutex);
-		RegisterKnownPipelineStateLocked(pipelineState);
-		gPipelineStates.push_back(capturedPipeline);
-		RebindPipelineStateInfoPointerFields(gPipelineStates.back());
-		MarkShaderReplacementApplyDirty();
+		{
+			std::lock_guard<std::mutex> lock(gPipelineMutex);
+			RegisterKnownPipelineStateLocked(pipelineState);
+			gPipelineStates.push_back(capturedPipeline);
+			RebindPipelineStateInfoPointerFields(gPipelineStates.back());
+			MarkShaderTargetApplyDirty();
+		}
+
+		ShaderAutomaticDiscovery::ProcessCapturedStreamPipeline(capturedPipeline);
 	}
 }

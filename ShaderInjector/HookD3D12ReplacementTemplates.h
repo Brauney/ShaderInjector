@@ -7,24 +7,34 @@
 
 //custom
 #include "HookD3D12.h"
-#include "ShaderReplacement.h"
+#include "ShaderTarget.h"
 
 namespace HookD3D12
 {
 	bool LoadPersistedShaderBlob(const std::string& path, std::vector<uint8_t>& bytecode, uint64_t& hash, SIZE_T& size);
-	bool LoadPersistedStreamTemplateFromReplacement(const ShaderReplacement::ShaderReplacementDisk& replacement, PipelineStateInfo& outPipeline);
-	void BackfillReplacementPortableMetadataFromSidecars(ShaderReplacement::ShaderReplacementDisk& replacement);
-	uint64_t StreamShaderHashForType(const PipelineStateInfo& pipeline, ShaderReplacement::ShaderType shaderType);
-	bool StreamPipelineHasShaderHash(const PipelineStateInfo& pipeline, ShaderReplacement::ShaderType shaderType, uint64_t shaderHash);
-	void FillPipelineTemplateCommonState(ShaderReplacement::ShaderPipelineTemplateDisk& pipelineTemplate, const PipelineStateInfo& pipeline);
-	ShaderReplacement::ShaderReplacementDisk ReplacementWithPipelineTemplate(const ShaderReplacement::ShaderReplacementDisk& replacement, const ShaderReplacement::ShaderPipelineTemplateDisk& pipelineTemplate);
+	bool LoadPersistedStreamTemplateFromReplacement(const ShaderTarget::ShaderTargetDisk& replacement, PipelineStateInfo& outPipeline);
+	void BackfillReplacementPortableMetadataFromSidecars(ShaderTarget::ShaderTargetDisk& replacement);
+	uint64_t StreamShaderHashForType(const PipelineStateInfo& pipeline, ShaderTarget::ShaderType shaderType);
+	bool StreamPipelineHasShaderHash(const PipelineStateInfo& pipeline, ShaderTarget::ShaderType shaderType, uint64_t shaderHash);
+	void FillPipelineTemplateCommonState(ShaderTarget::ShaderPipelineTemplateDisk& pipelineTemplate, const PipelineStateInfo& pipeline);
+	ShaderTarget::ShaderTargetDisk ReplacementWithPipelineTemplate(const ShaderTarget::ShaderTargetDisk& replacement, const ShaderTarget::ShaderPipelineTemplateDisk& pipelineTemplate);
 	SIZE_T CountMatchingBytes(const std::vector<uint8_t>& lhs, const std::vector<uint8_t>& rhs);
-	bool WriteStreamPipelineTemplateVariant(ShaderReplacement::ShaderReplacementDisk& replacement, const PipelineStateInfo& pipeline, int pipelineIndex, int templateIndex, bool& ok);
-	void WriteMatchingStreamPipelineTemplateVariants(ShaderReplacement::ShaderReplacementDisk& replacement, ShaderReplacement::ShaderType shaderType, uint64_t shaderHash, bool& ok);
+	bool WriteStreamPipelineTemplateVariant(ShaderTarget::ShaderTargetDisk& replacement, const PipelineStateInfo& pipeline, int pipelineIndex, int templateIndex, bool& ok);
+	void WriteMatchingStreamPipelineTemplateVariants(ShaderTarget::ShaderTargetDisk& replacement, ShaderTarget::ShaderType shaderType, uint64_t shaderHash, bool& ok);
+	bool PersistAppliedStreamPipelineTemplate(
+		ShaderTarget::ShaderTargetDisk& replacement,
+		const PipelineStateInfo& pipeline,
+		int pipelineIndex,
+		ShaderTarget::ShaderType shaderType,
+		uint64_t shaderHash);
+	bool PersistStreamPipelineTemplatesForShaderAlias(
+		ShaderTarget::ShaderTargetDisk& replacement,
+		ShaderTarget::ShaderType shaderType,
+		uint64_t shaderHash);
 	bool SelectPersistedPipelineTemplateForUncaptured(
-		const ShaderReplacement::ShaderReplacementDisk& replacement,
+		const ShaderTarget::ShaderTargetDisk& replacement,
 		const UncapturedPipelineStateInfo& uncaptured,
-		ShaderReplacement::ShaderReplacementDisk& outTemplateReplacement,
+		ShaderTarget::ShaderTargetDisk& outTemplateReplacement,
 		std::string& outTemplateName,
 		SIZE_T& outMatchingBytes);
 }

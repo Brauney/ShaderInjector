@@ -27,10 +27,10 @@
     <ClInclude Include="PreCompiledHeader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="DatabaseShaderReplacements.h">
+    <ClInclude Include="DatabaseShaderTargets.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="DatabaseShaderSources.h">
+	<ClInclude Include="DatabaseModifiedShaders.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="DatabaseGraphicsPSOs.h">
@@ -99,10 +99,31 @@
 	<ClInclude Include="ProcessRunner.h">
 	  <Filter>Header Files</Filter>
 	</ClInclude>
+	<ClInclude Include="ShaderAnalysis.h">
+	  <Filter>Header Files</Filter>
+	</ClInclude>
+	<ClInclude Include="ShaderAnalyzer.h">
+	  <Filter>Header Files</Filter>
+	</ClInclude>
+	<ClInclude Include="ShaderDiscovery.h">
+	  <Filter>Header Files</Filter>
+	</ClInclude>
+	<ClInclude Include="ShaderAutomaticDiscovery.h">
+	  <Filter>Header Files</Filter>
+	</ClInclude>
+	<ClInclude Include="ModifiedShader.h">
+	  <Filter>Header Files</Filter>
+	</ClInclude>
+	<ClInclude Include="ModifiedShaderCreation.h">
+	  <Filter>Header Files</Filter>
+	</ClInclude>
+	<ClInclude Include="SimilarityScore.h">
+	  <Filter>Header Files</Filter>
+	</ClInclude>
     <ClInclude Include="JsonHelper.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ShaderReplacement.h">
+    <ClInclude Include="ShaderTarget.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ShaderTemplates.h">
@@ -117,7 +138,13 @@
     <ClInclude Include="ShaderInjectorGUI.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ShaderInjectorGUIShaderSources.h">
+    <ClInclude Include="SystemInfoLogger.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderDocIntegration.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ExternalDependencies\renderdoc\include\renderdoc_app.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -125,10 +152,10 @@
     <ClCompile Include="dllmain.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="DatabaseShaderReplacements.cpp">
+    <ClCompile Include="DatabaseShaderTargets.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="DatabaseShaderSources.cpp">
+	<ClCompile Include="DatabaseModifiedShaders.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="DatabaseGraphicsPSOs.cpp">
@@ -206,19 +233,43 @@
 	<ClCompile Include="ProcessRunner.cpp">
 	  <Filter>Source Files</Filter>
 	</ClCompile>
+	<ClCompile Include="ShaderAnalyzer.cpp">
+	  <Filter>Source Files</Filter>
+	</ClCompile>
+	<ClCompile Include="ShaderAnalysis.cpp">
+	  <Filter>Source Files</Filter>
+	</ClCompile>
+	<ClCompile Include="ShaderDiscovery.cpp">
+	  <Filter>Source Files</Filter>
+	</ClCompile>
+	<ClCompile Include="ShaderAutomaticDiscovery.cpp">
+	  <Filter>Source Files</Filter>
+	</ClCompile>
+	<ClCompile Include="ModifiedShader.cpp">
+	  <Filter>Source Files</Filter>
+	</ClCompile>
+	<ClCompile Include="ModifiedShaderCreation.cpp">
+	  <Filter>Source Files</Filter>
+	</ClCompile>
     <ClCompile Include="DatabaseStreamPSOs.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ShaderTemplates.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ShaderReplacement.cpp">
+    <ClCompile Include="ShaderTarget.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+	<ClCompile Include="ShaderTargetSimilarity.cpp">
+	  <Filter>Source Files</Filter>
+	</ClCompile>
     <ClCompile Include="ShaderInjectorGUI.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ShaderInjectorGUIShaderSources.cpp">
+    <ClCompile Include="SystemInfoLogger.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderDocIntegration.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
