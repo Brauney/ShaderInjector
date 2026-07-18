@@ -225,5 +225,3 @@ If the image is too dark for you, or in some areas I would advise using these co
 Save changes to the file and tab or open the game back up, and click ```Recompile All```.
 
 ![recompile-all](GithubContent/LiveShaderEditing/recompile-all.png)
-
-You should see immediate visual changes after compilation completes, with more visible ambient occlusion and local bounce light!
