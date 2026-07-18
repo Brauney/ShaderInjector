@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "format": "ShaderInjector.ModifiedShader",
+  "enabled": true,
+  "id": "ModifiedPixelShader_969F218B0BF273AF_HDRMenuFGExperimental",
+  "name": "GameVersion1005_PostProcessFinal_HDR_Menu_FG_Experimental",
+  "author": "local HDR investigation",
+  "description": "EXPERIMENTAL HDR replacement for FF7 Rebirth 1.0.0.5's DLSS Frame Generation menu/pause final pass. Preserves the captured three-layer SDR menu composition and three-target HDR10 output.",
+  "shaderType": 4,
+  "shaderProfile": "ps_6_6",
+  "shaderEntryPoint": "main",
+  "sourceFile": "GameVersion1005_PostProcessFinal_HDR_Menu_FG_Experimental_Source.hlsl",
+  "compiledBlobFile": "GameVersion1005_PostProcessFinal_HDR_Menu_FG_Experimental_Compiled.blob",
+  "targets": [
+    {
+      "name": "CapturedShader_969F218B0BF273AF",
+      "knownShaderBytecodeHashes": [
+        "969F218B0BF273AF"
+      ],
+      "originalShaderBytecodeLength": "27344"
+    }
+  ]
+}

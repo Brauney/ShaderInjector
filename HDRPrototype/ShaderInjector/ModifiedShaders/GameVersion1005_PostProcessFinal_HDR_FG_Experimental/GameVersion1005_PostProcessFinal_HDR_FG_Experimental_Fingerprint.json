@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "format": "ShaderInjector.ModifiedShader",
+  "enabled": true,
+  "id": "ModifiedPixelShader_52F84DBF2D54B015_HDRFGExperimental",
+  "name": "GameVersion1005_PostProcessFinal_HDR_FG_Experimental",
+  "author": "local HDR investigation",
+  "description": "EXPERIMENTAL HDR replacement for FF7 Rebirth 1.0.0.5's DLSS Frame Generation gameplay final pass. Preserves the captured three-target scene/composite output and HDR10 path.",
+  "shaderType": 4,
+  "shaderProfile": "ps_6_6",
+  "shaderEntryPoint": "main",
+  "sourceFile": "GameVersion1005_PostProcessFinal_HDR_FG_Experimental_Source.hlsl",
+  "compiledBlobFile": "GameVersion1005_PostProcessFinal_HDR_FG_Experimental_Compiled.blob",
+  "targets": [
+    {
+      "name": "CapturedShader_52F84DBF2D54B015",
+      "knownShaderBytecodeHashes": [
+        "52F84DBF2D54B015"
+      ],
+      "originalShaderBytecodeLength": "27024"
+    }
+  ]
+}

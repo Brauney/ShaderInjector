@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "format": "ShaderInjector.ModifiedShader",
+  "enabled": true,
+  "id": "ModifiedPixelShader_CBA9C01BD1B69ABF_HDRExperimental",
+  "name": "GameVersion1005_PostProcessFinal_HDR_Experimental",
+  "author": "local HDR investigation",
+  "description": "EXPERIMENTAL HDR baseline for FF7 Rebirth 1.0.0.5. Preserves the captured HDR target's BT.2020 PQ LUT path. Do not install alongside the magenta HDR probe.",
+  "shaderType": 4,
+  "shaderProfile": "ps_6_6",
+  "shaderEntryPoint": "main",
+  "sourceFile": "GameVersion1005_PostProcessFinal_HDR_Experimental_Source.hlsl",
+  "compiledBlobFile": "GameVersion1005_PostProcessFinal_HDR_Experimental_Compiled.blob",
+  "targets": [
+    {
+      "name": "CapturedShader_CBA9C01BD1B69ABF",
+      "knownShaderBytecodeHashes": [
+        "CBA9C01BD1B69ABF"
+      ],
+      "originalShaderBytecodeLength": "26120"
+    }
+  ]
+}
