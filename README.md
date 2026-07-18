@@ -29,18 +29,25 @@ Shader Injector Mod for [FF7 Rebirth PC](https://store.steampowered.com/app/2909
 - [Video Installation](https://youtu.be/VQVaO2j4C4U)
 
 <p float="left">
-    <img src="GithubContent/Screenshots/3-on.jpg" width="49%" />
-    <img src="GithubContent/Screenshots/3-off.jpg" width="49%" />
+    <img src="GithubContent/Screenshots/2-0_b_on.jpg" width="49%" />
+    <img src="GithubContent/Screenshots/2-0_b_off.jpg" width="49%" />
 </p>
 
-*Left Side: Shader Injector On | Right Side: Shader Injector Off | (3840x2160)*
+*Left Side: Shader Injector 2.0 On | Right Side: Shader Injector 2.0 Off*
 
 <p float="left">
-    <img src="GithubContent/Screenshots/2-on.jpg" width="49%" />
-    <img src="GithubContent/Screenshots/2-off.jpg" width="49%" />
+    <img src="GithubContent/Screenshots/2-0_a_on.jpg" width="49%" />
+    <img src="GithubContent/Screenshots/2-0_a_off.jpg" width="49%" />
 </p>
 
-*Left Side: Shader Injector On | Right Side: Shader Injector Off | (3840x2160)*
+*Left Side: Shader Injector 2.0 On | Right Side: Shader Injector 2.0 Off*
+
+<p float="left">
+    <img src="GithubContent/Screenshots/2-0_c_on.jpg" width="49%" />
+    <img src="GithubContent/Screenshots/2-0_c_off.jpg" width="49%" />
+</p>
+
+*Left Side: Shader Injector 2.0 On | Right Side: Shader Injector 2.0 Off*
 
 ---
 # Issues
