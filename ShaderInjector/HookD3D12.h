@@ -3,6 +3,7 @@
 #include <dxgi.h>
 #include <d3d12.h>
 #include <dxgi1_4.h>
+#include <wrl/client.h>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -145,8 +146,8 @@ namespace HookD3D12
 		std::vector<uint8_t> cachedBlob;
 		bool attemptedReplacement = false;
 		ID3D12PipelineState* replacementPipelineState = nullptr;
-		ID3D12RootSignature* observedGraphicsRootSignature = nullptr;
-		ID3D12RootSignature* observedComputeRootSignature = nullptr;
+		std::vector<Microsoft::WRL::ComPtr<ID3D12RootSignature>> observedGraphicsRootSignatures;
+		std::vector<Microsoft::WRL::ComPtr<ID3D12RootSignature>> observedComputeRootSignatures;
 		std::string activeShaderTargetName;
 		ShaderTarget::ShaderType activeShaderTargetType = ShaderTarget::Unknown;
 		uint64_t activeShaderTargetHash = 0;

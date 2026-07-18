@@ -18,6 +18,7 @@
 #include <iomanip>
 #include <algorithm>
 #include <atomic>
+#include <utility>
 #include <dxgi.h>
 #include <dxgi1_4.h>
 #include <dxgi1_6.h>
@@ -90,8 +91,11 @@ namespace HookD3D12
 	static bool          gLoggedOverlayInitialized = false;
 
 	static std::vector<UncapturedPipelineStateInfo> gUncapturedPipelineStates;
+	static std::unordered_map<ID3D12PipelineState*, size_t> gUncapturedPipelineStateIndexByPointer;
+	static std::unordered_map<ID3D12GraphicsCommandList*, ID3D12PipelineState*> gCurrentPipelineStateByCommandList;
 	static std::unordered_map<ID3D12GraphicsCommandList*, ID3D12RootSignature*> gCurrentGraphicsRootSignatureByCommandList;
 	static std::unordered_map<ID3D12GraphicsCommandList*, ID3D12RootSignature*> gCurrentComputeRootSignatureByCommandList;
+	static constexpr size_t gMaximumObservedRootSignaturesPerPipeline = 8;
 
 	std::vector<PSOPendingRebuild> gPendingRebuilds;
 
@@ -348,6 +352,8 @@ namespace HookD3D12
 		GatherD3D12PipelineInfo(swapChain, gDevice, gCommandQueue, gPipelineInfo);
 	}
 
+	void RecordUncapturedPipelineStateLocked(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* pipelineState, const char* reason);
+
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| HOOK - SET GRAPHICS ROOT SIGNATURE |||||||||||||||||||||||||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| HOOK - SET GRAPHICS ROOT SIGNATURE |||||||||||||||||||||||||||||||||||||||||||||||||||||
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| HOOK - SET GRAPHICS ROOT SIGNATURE |||||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -358,6 +364,16 @@ namespace HookD3D12
 		{
 			std::lock_guard<std::mutex> lock(gPipelineMutex);
 			gCurrentGraphicsRootSignatureByCommandList[cmdList] = rootSignature;
+
+			if (Globals::gShaderInjectorEnabled)
+			{
+				auto pipelineStateIt = gCurrentPipelineStateByCommandList.find(cmdList);
+				if (pipelineStateIt != gCurrentPipelineStateByCommandList.end() && !IsKnownPipelineStateLocked(pipelineStateIt->second))
+				{
+					MarkUntrackedBoundPipelineStateLocked(pipelineStateIt->second);
+					RecordUncapturedPipelineStateLocked(cmdList, pipelineStateIt->second, "SetGraphicsRootSignature bound");
+				}
+			}
 		}
 
 		Original_SetGraphicsRootSignature(cmdList, rootSignature);
@@ -373,9 +389,39 @@ namespace HookD3D12
 		{
 			std::lock_guard<std::mutex> lock(gPipelineMutex);
 			gCurrentComputeRootSignatureByCommandList[cmdList] = rootSignature;
+
+			if (Globals::gShaderInjectorEnabled)
+			{
+				auto pipelineStateIt = gCurrentPipelineStateByCommandList.find(cmdList);
+				if (pipelineStateIt != gCurrentPipelineStateByCommandList.end() && !IsKnownPipelineStateLocked(pipelineStateIt->second))
+				{
+					MarkUntrackedBoundPipelineStateLocked(pipelineStateIt->second);
+					RecordUncapturedPipelineStateLocked(cmdList, pipelineStateIt->second, "SetComputeRootSignature bound");
+				}
+			}
 		}
 
 		Original_SetComputeRootSignature(cmdList, rootSignature);
+	}
+
+	bool AddObservedRootSignatureCandidateLocked(
+		std::vector<Microsoft::WRL::ComPtr<ID3D12RootSignature>>& candidates,
+		ID3D12RootSignature* rootSignature)
+	{
+		if (!rootSignature)
+			return false;
+
+		for (const auto& candidate : candidates)
+		{
+			if (candidate.Get() == rootSignature)
+				return false;
+		}
+
+		if (candidates.size() >= gMaximumObservedRootSignaturesPerPipeline)
+			candidates.erase(candidates.begin());
+
+		candidates.emplace_back(rootSignature);
+		return true;
 	}
 
 	void RecordUncapturedPipelineStateLocked(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* pipelineState, const char* reason)
@@ -388,42 +434,29 @@ namespace HookD3D12
 		auto computeRootIt = gCurrentComputeRootSignatureByCommandList.find(cmdList);
 		ID3D12RootSignature* observedComputeRootSignature = computeRootIt != gCurrentComputeRootSignatureByCommandList.end() ? computeRootIt->second : nullptr;
 
-		for (size_t uncapturedIndex = 0; uncapturedIndex < gUncapturedPipelineStates.size(); ++uncapturedIndex)
+		auto existingIndexIt = gUncapturedPipelineStateIndexByPointer.find(pipelineState);
+		if (existingIndexIt != gUncapturedPipelineStateIndexByPointer.end() && existingIndexIt->second < gUncapturedPipelineStates.size())
 		{
+			const size_t uncapturedIndex = existingIndexIt->second;
 			auto& info = gUncapturedPipelineStates[uncapturedIndex];
+			const bool updatedGraphics = AddObservedRootSignatureCandidateLocked(info.observedGraphicsRootSignatures, observedGraphicsRootSignature);
+			const bool updatedCompute = AddObservedRootSignatureCandidateLocked(info.observedComputeRootSignatures, observedComputeRootSignature);
 
-			if (info.pipelineState == pipelineState)
+			if (updatedGraphics || updatedCompute)
 			{
-				bool updated = false;
-
-				if (!info.observedGraphicsRootSignature && observedGraphicsRootSignature)
-				{
-					info.observedGraphicsRootSignature = observedGraphicsRootSignature;
-					updated = true;
-				}
-
-				if (!info.observedComputeRootSignature && observedComputeRootSignature)
-				{
-					info.observedComputeRootSignature = observedComputeRootSignature;
-					updated = true;
-				}
-
-				if (updated)
-				{
-					info.attemptedReplacement = false;
-					gUncapturedShaderTargetApplyCursor = (std::min)(gUncapturedShaderTargetApplyCursor, uncapturedIndex);
-					NotifyPipelineActivity();
-					MarkShaderTargetApplyDirty();
-				}
-
-				return;
+				info.attemptedReplacement = false;
+				gUncapturedShaderTargetApplyCursor = (std::min)(gUncapturedShaderTargetApplyCursor, uncapturedIndex);
+				NotifyPipelineActivity();
+				MarkShaderTargetApplyDirty();
 			}
+
+			return;
 		}
 
 		UncapturedPipelineStateInfo info{};
 		info.pipelineState = pipelineState;
-		info.observedGraphicsRootSignature = observedGraphicsRootSignature;
-		info.observedComputeRootSignature = observedComputeRootSignature;
+		AddObservedRootSignatureCandidateLocked(info.observedGraphicsRootSignatures, observedGraphicsRootSignature);
+		AddObservedRootSignatureCandidateLocked(info.observedComputeRootSignatures, observedComputeRootSignature);
 		GetPipelineCachedBlobInfo(pipelineState, info.cachedBlobHash, info.cachedBlobSize, &info.cachedBlob);
 
 		if (!info.cachedBlob.empty())
@@ -434,14 +467,16 @@ namespace HookD3D12
 			ShaderInjectorIO::WriteBinaryFile(path, info.cachedBlob.data(), info.cachedBlob.size());
 		}
 
-		gUncapturedPipelineStates.push_back(info);
+		const size_t uncapturedIndex = gUncapturedPipelineStates.size();
+		gUncapturedPipelineStates.push_back(std::move(info));
+		gUncapturedPipelineStateIndexByPointer[pipelineState] = uncapturedIndex;
 		NotifyPipelineActivity();
 
 		//char buffer[384];
 		//sprintf_s(buffer, "HookD3D12->RecordUncapturedPipelineStateLocked: %s uncaptured PSO=%p cachedHash=%s cachedBytes=%zu", reason ? reason : "Bound", pipelineState, info.cachedBlobHash ? Hash::FormatHash(info.cachedBlobHash).c_str() : "<none>", (size_t)info.cachedBlobSize);
 		//ShaderInjectorGUI::WriteToRuntimeLog(buffer);
 
-		if (info.cachedBlobHash)
+		if (gUncapturedPipelineStates[uncapturedIndex].cachedBlobHash)
 			MarkShaderTargetApplyDirty();
 	}
 
@@ -451,32 +486,32 @@ namespace HookD3D12
 
 	void STDMETHODCALLTYPE Hook_SetPipelineState(ID3D12GraphicsCommandList* cmdList, ID3D12PipelineState* pso)
 	{
-		if (!Globals::gShaderInjectorEnabled)
-		{
-			Original_SetPipelineState(cmdList, pso);
-			return;
-		}
+		ID3D12PipelineState* boundState = pso;
 
 		//IMPORTANT NOTE: brackets are important here, we need to limit the scope when collecting the root signature
 		{
 			std::lock_guard<std::mutex> lock(gPipelineMutex);
+			gCurrentPipelineStateByCommandList[cmdList] = pso;
 
-			if (gPipelineStateOverridesDirty)
-				RebuildPipelineStateOverrideMap();
-
-			if (!IsKnownPipelineStateLocked(pso) && MarkUntrackedBoundPipelineStateLocked(pso))
-				RecordUncapturedPipelineStateLocked(cmdList, pso, "SetPipelineState bound");
-
-			auto overrideIt = gPipelineStateOverrides.find(pso);
-
-			if (overrideIt != gPipelineStateOverrides.end() && overrideIt->second)
+			if (Globals::gShaderInjectorEnabled)
 			{
-				Original_SetPipelineState(cmdList, overrideIt->second);
-				return;
+				if (gPipelineStateOverridesDirty)
+					RebuildPipelineStateOverrideMap();
+
+				if (!IsKnownPipelineStateLocked(pso))
+				{
+					MarkUntrackedBoundPipelineStateLocked(pso);
+					RecordUncapturedPipelineStateLocked(cmdList, pso, "SetPipelineState bound");
+				}
+
+				auto overrideIt = gPipelineStateOverrides.find(pso);
+
+				if (overrideIt != gPipelineStateOverrides.end() && overrideIt->second)
+					boundState = overrideIt->second;
 			}
 		}
 
-		Original_SetPipelineState(cmdList, pso);
+		Original_SetPipelineState(cmdList, boundState);
 	}
 
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| RESET GRAPHICS COMMAND LIST |||||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -485,28 +520,51 @@ namespace HookD3D12
 
 	HRESULT STDMETHODCALLTYPE Hook_ResetGraphicsCommandList(ID3D12GraphicsCommandList* cmdList, ID3D12CommandAllocator* allocator, ID3D12PipelineState* initialState)
 	{
-		if (!Globals::gShaderInjectorEnabled)
-			return Original_ResetGraphicsCommandList(cmdList, allocator, initialState);
-
 		ID3D12PipelineState* boundState = initialState;
 
 		//IMPORTANT NOTE: brackets are important here, we need to limit the scope when collecting the root signature
 		{
 			std::lock_guard<std::mutex> lock(gPipelineMutex);
 
-			if (gPipelineStateOverridesDirty)
-				RebuildPipelineStateOverrideMap();
+			if (Globals::gShaderInjectorEnabled)
+			{
+				if (gPipelineStateOverridesDirty)
+					RebuildPipelineStateOverrideMap();
 
-			if (!IsKnownPipelineStateLocked(initialState) && MarkUntrackedBoundPipelineStateLocked(initialState))
-				RecordUncapturedPipelineStateLocked(cmdList, initialState, "CommandList Reset bound initial");
+				auto overrideIt = gPipelineStateOverrides.find(initialState);
 
-			auto overrideIt = gPipelineStateOverrides.find(initialState);
-
-			if (overrideIt != gPipelineStateOverrides.end() && overrideIt->second)
-				boundState = overrideIt->second;
+				if (overrideIt != gPipelineStateOverrides.end() && overrideIt->second)
+					boundState = overrideIt->second;
+			}
 		}
 
-		return Original_ResetGraphicsCommandList(cmdList, allocator, boundState);
+		const HRESULT resetResult = Original_ResetGraphicsCommandList(cmdList, allocator, boundState);
+
+		{
+			std::lock_guard<std::mutex> lock(gPipelineMutex);
+			gCurrentGraphicsRootSignatureByCommandList.erase(cmdList);
+			gCurrentComputeRootSignatureByCommandList.erase(cmdList);
+
+			if (SUCCEEDED(resetResult))
+			{
+				if (initialState)
+					gCurrentPipelineStateByCommandList[cmdList] = initialState;
+				else
+					gCurrentPipelineStateByCommandList.erase(cmdList);
+
+				if (Globals::gShaderInjectorEnabled && !IsKnownPipelineStateLocked(initialState))
+				{
+					MarkUntrackedBoundPipelineStateLocked(initialState);
+					RecordUncapturedPipelineStateLocked(cmdList, initialState, "CommandList Reset bound initial");
+				}
+			}
+			else
+			{
+				gCurrentPipelineStateByCommandList.erase(cmdList);
+			}
+		}
+
+		return resetResult;
 	}
 
 	//||||||||||||||||||||||||||||||||||||||||||||||||||||| CREATE COMPUTE PIPELINE STATE |||||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -1271,13 +1329,29 @@ namespace HookD3D12
 		if (!LoadPersistedStreamTemplateFromReplacement(templateReplacement, persistedPipeline))
 			return false;
 
-		ID3D12RootSignature* observedRootSignature = nullptr;
+		std::vector<ID3D12RootSignature*> observedRootSignatures;
 		const bool preferComputeRootSignature = shaderType == ShaderTarget::ComputeShader || (persistedPipeline.isCompute && !persistedPipeline.isGraphics);
 		
+		auto AppendObservedRootSignatures = [&](const std::vector<Microsoft::WRL::ComPtr<ID3D12RootSignature>>& candidates)
+		{
+			for (auto candidateIt = candidates.rbegin(); candidateIt != candidates.rend(); ++candidateIt)
+			{
+				ID3D12RootSignature* candidate = candidateIt->Get();
+				if (candidate && std::find(observedRootSignatures.begin(), observedRootSignatures.end(), candidate) == observedRootSignatures.end())
+					observedRootSignatures.push_back(candidate);
+			}
+		};
+
 		if (preferComputeRootSignature)
-			observedRootSignature = uncaptured.observedComputeRootSignature ? uncaptured.observedComputeRootSignature : uncaptured.observedGraphicsRootSignature;
+		{
+			AppendObservedRootSignatures(uncaptured.observedComputeRootSignatures);
+			AppendObservedRootSignatures(uncaptured.observedGraphicsRootSignatures);
+		}
 		else
-			observedRootSignature = uncaptured.observedGraphicsRootSignature ? uncaptured.observedGraphicsRootSignature : uncaptured.observedComputeRootSignature;
+		{
+			AppendObservedRootSignatures(uncaptured.observedGraphicsRootSignatures);
+			AppendObservedRootSignatures(uncaptured.observedComputeRootSignatures);
+		}
 
 		ID3D12RootSignature* persistedRootSignature = GetOrCreatePersistedRootSignature(templateReplacement, gDevice);
 		bool attemptedAnyRootSignature = false;
@@ -1306,13 +1380,18 @@ namespace HookD3D12
 			if (TryRebuildWithRootSignature(persistedRootSignature, "persisted root signature blob"))
 				return true;
 
-			if (observedRootSignature && observedRootSignature != persistedRootSignature)
+			if (!observedRootSignatures.empty())
 				ShaderInjectorGUI::WriteToRuntimeLogWarning("HookD3D12->TryApplyPersistedStreamTemplateToUncaptured: Persisted root signature rebuild failed; retrying observed command-list root signature: " + replacement.name + templateLogSuffix);
 		}
 
-		if (observedRootSignature && observedRootSignature != persistedRootSignature)
+		for (size_t observedIndex = 0; observedIndex < observedRootSignatures.size(); ++observedIndex)
 		{
-			if (TryRebuildWithRootSignature(observedRootSignature, "observed command-list root signature"))
+			ID3D12RootSignature* observedRootSignature = observedRootSignatures[observedIndex];
+			if (observedRootSignature == persistedRootSignature)
+				continue;
+
+			const std::string rootSignatureSource = "observed command-list root signature " + std::to_string(observedIndex + 1) + "/" + std::to_string(observedRootSignatures.size());
+			if (TryRebuildWithRootSignature(observedRootSignature, rootSignatureSource.c_str()))
 				return true;
 		}
 
@@ -2322,6 +2401,9 @@ namespace HookD3D12
 		}
 
 		ReleaseRootSignatureCache();
+		gUncapturedPipelineStates.clear();
+		gUncapturedPipelineStateIndexByPointer.clear();
+		gCurrentPipelineStateByCommandList.clear();
 		gCurrentGraphicsRootSignatureByCommandList.clear();
 		gCurrentComputeRootSignatureByCommandList.clear();
 
